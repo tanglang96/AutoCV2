@@ -42,7 +42,7 @@ class CopyChannels(torch.nn.Module):
 
 
 class Normalize(torch.nn.Module):
-    def __init__(self, mean, std, inplace=False):
+    def __init__(self, mean=0.5, std=0.25, inplace=False):
         super(Normalize, self).__init__()
         self.register_buffer('mean', torch.tensor(mean, dtype=torch.float32)[None, :, None, None])
         self.register_buffer('std', torch.tensor(std, dtype=torch.float32)[None, :, None, None])

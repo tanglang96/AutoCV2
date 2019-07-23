@@ -70,11 +70,11 @@ class Model(LogicModel):
 
         epsilon = min(0.1, max(0.001, 0.001 * pow(num_class / 10, 2)))
         self.model.norm = skeleton.nn.Normalize(self.info['dataset']['train']['data']['mean'],
-                                                   self.info['dataset']['train']['data']['std'],
-                                                   inplace=False).cuda().half()
+                                                self.info['dataset']['train']['data']['std'],
+                                                inplace=False).cuda().half()
         self.model_pred.norm = skeleton.nn.Normalize(self.info['dataset']['train']['data']['mean'],
-                                                        self.info['dataset']['train']['data']['std'],
-                                                        inplace=False).cuda().half()
+                                                     self.info['dataset']['train']['data']['std'],
+                                                     inplace=False).cuda().half()
         if self.is_multiclass():
             self.model.loss_fn = torch.nn.BCEWithLogitsLoss(reduction='none')
             # self.model.loss_fn = skeleton.nn.BinaryCrossEntropyLabelSmooth(num_class, epsilon=epsilon, reduction='none')
@@ -355,6 +355,7 @@ class Model(LogicModel):
         predictions = []
         self.model_pred.eval()
         for step, (examples, labels) in enumerate(dataloader):
+            self.use_test_time_augmentation = False
             # examples = examples[0]
             # skeleton.nn.MoveToHook.to((examples, labels), self.device, self.is_half)
 

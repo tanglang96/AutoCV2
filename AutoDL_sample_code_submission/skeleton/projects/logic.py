@@ -23,6 +23,7 @@ class LogicModel(Model):
         LOGGER.info('--------- Model.metadata ----------')
         LOGGER.info('path: %s', self.metadata.get_dataset_name())
         LOGGER.info('shape:  %s', self.metadata.get_tensor_size(0))
+        LOGGER.info('all shape:  %s', self.metadata.get_tensor_shape(0))
         LOGGER.info('size: %s', self.metadata.size())
         LOGGER.info('num_class:  %s', self.metadata.get_output_size())
 
@@ -88,7 +89,7 @@ class LogicModel(Model):
                 'threshold_valid_score_diff': 0.001,
                 'max_inner_loop_ratio': 0.2,
                 'min_lr': 1e-6,
-                'use_fast_auto_aug': True
+                'use_fast_auto_aug': False
             }
         }
         self.checkpoints = []
@@ -178,7 +179,16 @@ class LogicModel(Model):
             size = list(map(
                 lambda x: int(x / self.hyper_params['dataset']['base'] + 0.8) * self.hyper_params['dataset']['base'],
                 size))
+            if self.metadata.get_tensor_size(0)[0] != -1 and self.metadata.get_tensor_size(0)[1] != -1:
+                size[0], size[1] = 1, 1
+                while size[0] * 2 < self.metadata.get_tensor_size(0)[0]:
+                    size[0] *= 2
+                while size[1] * 2 < self.metadata.get_tensor_size(0)[1]:
+                    size[1] *= 2
+                size[0] = int(size[0])
+                size[1] = int(size[1])
             input_shape = size + [channels]
+
         LOGGER.info('[input_shape] origin:%s aspect_ratio:%f target:%s', [height, width, channels], aspect_ratio,
                     input_shape)
 
@@ -255,7 +265,7 @@ class LogicModel(Model):
             # sampler = skeleton.data.InfiniteSampler(train_dataset, shuffle=True)
 
             transform = tv.transforms.Compose([
-                skeleton.data.RandomFlip(p=0.5),
+                # skeleton.data.RandomFlip(p=0.5),
             ])
             train_dataset = skeleton.data.TransformDataset(train_dataset, transform, index=0)
 
@@ -305,7 +315,7 @@ class LogicModel(Model):
             input_shape = self.hyper_params['dataset']['input']
 
             preprocessor1 = get_tf_resize(input_shape[0], input_shape[1])
-            preprocessor2 = get_tf_to_tensor(is_random_flip=True)
+            preprocessor2 = get_tf_to_tensor(is_random_flip=False)
             preprocessor = lambda *tensor: preprocessor2(preprocessor1(*tensor))
 
             if num_items < 10000:
@@ -355,7 +365,7 @@ class LogicModel(Model):
                 dataset,
                 steps=self.hyper_params['dataset']['steps_per_epoch'],
                 batch_size=batch_size,
-                shuffle=False, drop_last=True, num_workers=0, pin_memory=False
+                shuffle=True, drop_last=True, num_workers=0, pin_memory=False
             )
         elif mode in ['valid', 'test']:
             batch_size = self.hyper_params['dataset']['batch_size_test']

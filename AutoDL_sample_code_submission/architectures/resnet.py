@@ -26,6 +26,7 @@ class ResNet18(models.ResNet):
     def __init__(self, in_channels, num_classes=10, **kwargs):
         Block = BasicBlock
         super(ResNet18, self).__init__(Block, [2, 2, 2, 2], num_classes=num_classes, **kwargs)  # resnet18
+        # self.norm = skeleton.nn.Normalize(inplace=False).cuda().half()
         self.norm = None
         # self.normalize_input = skeleton.nn.Normalize(self.mean, self.std, inplace=False),
         if in_channels == 3:
@@ -73,6 +74,27 @@ class ResNet18(models.ResNet):
         # torch.nn.init.kaiming_uniform_(self.fc.weight, mode='fan_in', nonlinearity='sigmoid')
         torch.nn.init.xavier_uniform_(self.fc.weight, gain=gain)
         LOGGER.debug('initialize classifier weight')
+        for m in self.layer1.modules():
+            if isinstance(m, nn.Conv2d):
+                n = m.kernel_size[0] * m.kernel_size[1] * m.in_channels
+                m.weight.data.normal_(0, math.sqrt(2. / n))
+            elif isinstance(m, nn.BatchNorm2d):
+                m.weight.data.fill_(1)
+                m.bias.data.zero_()
+        for m in self.layer2.modules():
+            if isinstance(m, nn.Conv2d):
+                n = m.kernel_size[0] * m.kernel_size[1] * m.in_channels
+                m.weight.data.normal_(0, math.sqrt(2. / n))
+            elif isinstance(m, nn.BatchNorm2d):
+                m.weight.data.fill_(1)
+                m.bias.data.zero_()
+        for m in self.layer3.modules():
+            if isinstance(m, nn.Conv2d):
+                n = m.kernel_size[0] * m.kernel_size[1] * m.in_channels
+                m.weight.data.normal_(0, math.sqrt(2. / n))
+            elif isinstance(m, nn.BatchNorm2d):
+                m.weight.data.fill_(1)
+                m.bias.data.zero_()
         for m in self.layer4.modules():
             if isinstance(m, nn.Conv2d):
                 n = m.kernel_size[0] * m.kernel_size[1] * m.in_channels
