@@ -8,6 +8,7 @@ import numpy as np
 import tensorflow as tf
 from ..nn.modules.hooks import MoveToHook
 
+
 LOGGER = logging.getLogger(__name__)
 
 
@@ -31,6 +32,16 @@ class TFDataset(Dataset):
         return self.num_samples
 
     def __getitem__(self, index):
+        session = self.session if self.session is not None else tf.Session()
+        try:
+            example, label = session.run(self.next_element)
+        except tf.errors.OutOfRangeError:
+            self.reset()
+            raise StopIteration
+
+        return example, label
+
+    def __call__(self, *args, **kwargs):
         session = self.session if self.session is not None else tf.Session()
         try:
             example, label = session.run(self.next_element)
@@ -150,3 +161,5 @@ def prefetch_dataset(dataset, num_workers=4, batch_size=32, device=None, half=Fa
         tensors = [t.half() if t.is_floating_point() else t for t in tensors]
 
     return torch.utils.data.TensorDataset(*tensors)
+
+

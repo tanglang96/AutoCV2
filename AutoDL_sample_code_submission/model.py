@@ -7,9 +7,9 @@ import tensorflow as tf
 import torch
 import torchvision as tv
 import numpy as np
-
+import torch.nn as nn
 import skeleton
-from architectures.resnet import ResNet18
+from architectures.resnet import ResNet18,ResNet18_Small
 from skeleton.projects import LogicModel, get_logger
 from skeleton.projects.others import NBAC, AUC
 
@@ -42,17 +42,23 @@ class Model(LogicModel):
         self.session = tf.Session()
 
         LOGGER.info('[init] Model')
-        Network = ResNet18  # ResNet18  # BasicNet, SENet18, ResNet18
+        if self.info['dataset']['size']<5000:
+            Network = ResNet18_Small
+        else:
+            Network = ResNet18  # ResNet18  # BasicNet, SENet18, ResNet18
         self.model = Network(in_channels, num_class)
         self.model_pred = Network(in_channels, num_class).eval()
         # torch.cuda.synchronize()
 
         LOGGER.info('[init] weight initialize')
-        if Network in [ResNet18]:
+        if Network in [ResNet18,ResNet18_Small]:
+            # model_path = os.path.join(base_dir, 'models/resnet18-5c106cde.pth')
             model_path = os.path.join(base_dir, 'models')
             LOGGER.info('model path: %s', model_path)
 
             self.model.init(model_dir=model_path, gain=1.0)
+            self.model_pred.init(model_dir=model_path, gain=1.0)
+
         else:
             self.model.init(gain=1.0)
         # torch.cuda.synchronize()
@@ -88,11 +94,13 @@ class Model(LogicModel):
             LOGGER.info('[update_model] %s (tau:%f, epsilon:%f)', self.model.loss_fn.__class__.__name__, self.tau,
                         epsilon)
         self.model_pred.loss_fn = self.model.loss_fn
-
+        if self.info['dataset']['size'] < 5000:  # small dataset will cause overfitting
+            self.model.fc.dropout = nn.Dropout(p=0.2)
         self.init_opt()
         LOGGER.info('[update] done.')
 
-    def init_opt(self):
+    def init_opt(self, init_lr=0.025):
+        self.init_lr = init_lr
         steps_per_epoch = self.hyper_params['dataset']['steps_per_epoch']
         batch_size = self.hyper_params['dataset']['batch_size']
 
@@ -102,8 +110,8 @@ class Model(LogicModel):
         lr_multiplier = max(1.0, batch_size / 32)
         scheduler_lr = skeleton.optim.gradual_warm_up(
             skeleton.optim.get_reduce_on_plateau_scheduler(
-                0.025 * lr_multiplier / warmup_multiplier,
-                patience=10, factor=.5, metric_name='train_loss'
+                init_lr * lr_multiplier / warmup_multiplier,  # initial 0.025
+                patience=10, factor=.75, metric_name='train_loss'   # initial patience=10 factor=0.5
             ),
             warm_up_epoch=5,
             multiplier=warmup_multiplier
@@ -159,7 +167,7 @@ class Model(LogicModel):
             num_sub_policy = 3
             num_select_policy = 3
             searched_policy = []
-            for policy_search in range(num_policy_search):
+            for policy_search in range(num_policy_search):  # random search num_policy_search times
                 selected_idx = np.random.choice(list(range(len(policy))), num_sub_policy)
                 selected_policy = [policy[i] for i in selected_idx]
                 self.dataloaders['valid'].dataset.transform.transforms = original_valid_policy + [
@@ -196,6 +204,7 @@ class Model(LogicModel):
 
             flatten = lambda l: [item for sublist in l for item in sublist]
 
+            # random sample non-duplicate policy from num_select_policy best(max score on valid_loader) policy list as training policy
             policy_sorted_index = np.argsort([p['score'] for p in searched_policy])[::-1][:num_select_policy]
             policy = flatten([searched_policy[idx]['policy'] for idx in policy_sorted_index])
             policy = skeleton.data.augmentations.remove_duplicates(policy)
@@ -208,7 +217,7 @@ class Model(LogicModel):
                 lambda t: t.cpu().float() if isinstance(t, torch.Tensor) else torch.Tensor(t),
                 tv.transforms.ToPILImage(),
                 skeleton.data.augmentations.Augmentation(
-                    policy
+                    policy  # actually a policy list, every time random sample one policy
                 ),
                 tv.transforms.ToTensor(),
                 lambda t: t.to(device=self.device).half()
@@ -356,6 +365,7 @@ class Model(LogicModel):
         self.model_pred.eval()
         for step, (examples, labels) in enumerate(dataloader):
             self.use_test_time_augmentation = False
+            # self.use_test_time_augmentation = False
             # examples = examples[0]
             # skeleton.nn.MoveToHook.to((examples, labels), self.device, self.is_half)
 
@@ -376,6 +386,6 @@ class Model(LogicModel):
             logits, prediction = self.activation(logits)
 
             predictions.append(logits.detach().float().cpu().numpy())
-
+        # print(predictions)
         predictions = np.concatenate(predictions, axis=0).astype(np.float)
         return predictions
