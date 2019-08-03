@@ -10,12 +10,13 @@ import numpy as np
 from .api import Model
 from .others import *
 import skeleton
-
+from skeleton.data.dataloader import *
 from sklearn.preprocessing import LabelEncoder
 from sklearn.model_selection import StratifiedShuffleSplit
 import numpy as np
 
 LOGGER = get_logger(__name__)
+
 
 class LogicModel(Model):
     def __init__(self, metadata, session=None):
@@ -229,15 +230,11 @@ class LogicModel(Model):
             dataset = skeleton.data.TFDataset(self.session, tf_dataset, num_images)
 
             LOGGER.info('[%s] scan before', 'train')
-            # self.info['dataset']['train'], tensors = dataset.scan(
-            #     with_tensors=True, is_batch=True,
-            #     device=self.device, half=self.is_half
-            # )
             _, tensors = dataset.scan(
                 with_tensors=True, is_batch=True,
                 device=self.device, half=self.is_half
             )
-            tensors = [torch.cat(t, dim=0) for t in zip(*tensors)]
+            # tensors = [torch.cat(t, dim=0) for t in zip(*tensors)]
             LOGGER.info('[%s] scan after', 'train')
 
             del tf_dataset
@@ -375,7 +372,6 @@ class LogicModel(Model):
             preprocessor1 = get_tf_resize(input_shape[0], input_shape[1])
             preprocessor2 = get_tf_to_tensor(is_random_flip=False)
             preprocessor = lambda *tensor: preprocessor2(preprocessor1(*tensor))
-            # dataset = dataset.cache()  # to accelerate scan
 
             # batch_size = 500
             tf_dataset = dataset.apply(
@@ -386,20 +382,21 @@ class LogicModel(Model):
                     num_parallel_calls=tf.data.experimental.AUTOTUNE
                 )
             ).prefetch(buffer_size=3)
+
             dataset = skeleton.data.TFDataset(self.session, tf_dataset, num_items)
-            # ------------------------------------------------------------------------------
+
             LOGGER.info('[%s] scan before', mode)
             self.info['dataset'][mode], tensors = dataset.scan(
                 with_tensors=True, is_batch=True,
                 device=self.device, half=self.is_half
             )
-            tensors = [torch.cat(t, dim=0) for t in zip(*tensors)]
+            # tensors = [torch.cat(t, dim=0) for t in zip(*tensors)]
             LOGGER.info('[%s] scan after', mode)
 
             del tf_dataset
             del dataset
             dataset = skeleton.data.prefetch_dataset(tensors)
-            # ------------------------------------------------------------------------------
+
             transform = tv.transforms.Compose([
             ])
             dataset = skeleton.data.TransformDataset(dataset, transform, index=0)
@@ -409,6 +406,7 @@ class LogicModel(Model):
                 shuffle=False, drop_last=False, num_workers=0, pin_memory=False
             )
             self.info['condition']['first'][mode] = False
+
         LOGGER.debug('[dataloader] %s build end', mode)
         return self.dataloaders[mode]
 
@@ -617,17 +615,6 @@ class LogicModel(Model):
 
             self.timers['train']('end')
 
-        # if 'test' in self.dataloaders and self.dataloaders['test'] is not None and \
-        #     not is_skip_valid:
-        #     self.prediction(self.dataloaders['test'])
-        #     for step in range(3):
-        #         test_metric = self.epoch_train(self.info['loop']['epoch'], self.dataloaders['test'])
-        #         LOGGER.info(
-        #             '[train] [%02d] [%02d/%02d] [finetune] loss:%.3f score:%.3f',
-        #             self.info['loop']['epoch'], step, 3, test_metric['loss'], test_metric['score'],
-        #         )
-        # self.timers['train']('finetune')
-
         remaining_time_budget -= self.timers['train'].step_time
         self.terminate_train_loop_condition(remaining_time_budget, inner_epoch)
 
@@ -653,7 +640,6 @@ class LogicModel(Model):
 
         rv = self.prediction(dataloader)
         self.timers['test']('end')
-
         LOGGER.info(
             '[test ] [%02d] test:%02d time(budge:%.2f, total:%.2f, step:%.2f)',
             self.info['loop']['epoch'], self.info['loop']['test'], remaining_time_budget, self.get_total_time(),

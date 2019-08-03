@@ -9,7 +9,7 @@ import torchvision as tv
 import numpy as np
 import torch.nn as nn
 import skeleton
-from architectures.resnet import ResNet18,ResNet18_Small
+from architectures.resnet import ResNet18, ResNet18_Small
 from skeleton.projects import LogicModel, get_logger
 from skeleton.projects.others import NBAC, AUC
 
@@ -42,7 +42,7 @@ class Model(LogicModel):
         self.session = tf.Session()
 
         LOGGER.info('[init] Model')
-        if self.info['dataset']['size']<5000:
+        if self.info['dataset']['size'] < 5000:
             Network = ResNet18_Small
         else:
             Network = ResNet18  # ResNet18  # BasicNet, SENet18, ResNet18
@@ -51,7 +51,7 @@ class Model(LogicModel):
         # torch.cuda.synchronize()
 
         LOGGER.info('[init] weight initialize')
-        if Network in [ResNet18,ResNet18_Small]:
+        if Network in [ResNet18, ResNet18_Small]:
             # model_path = os.path.join(base_dir, 'models/resnet18-5c106cde.pth')
             model_path = os.path.join(base_dir, 'models')
             LOGGER.info('model path: %s', model_path)
@@ -111,7 +111,7 @@ class Model(LogicModel):
         scheduler_lr = skeleton.optim.gradual_warm_up(
             skeleton.optim.get_reduce_on_plateau_scheduler(
                 init_lr * lr_multiplier / warmup_multiplier,  # initial 0.025
-                patience=10, factor=.75, metric_name='train_loss'   # initial patience=10 factor=0.5
+                patience=10, factor=.5, metric_name='train_loss'  # initial patience=10 factor=0.5
             ),
             warm_up_epoch=5,
             multiplier=warmup_multiplier
@@ -163,7 +163,7 @@ class Model(LogicModel):
             original_train_policy = self.dataloaders['train'].dataset.transform.transforms
             policy = skeleton.data.augmentations.autoaug_policy()
 
-            num_policy_search = 100
+            num_policy_search = 50
             num_sub_policy = 3
             num_select_policy = 3
             searched_policy = []
@@ -184,12 +184,7 @@ class Model(LogicModel):
                 for policy_eval in range(num_sub_policy):
                     valid_dataloader = self.build_or_get_dataloader('valid', self.datasets['valid'],
                                                                     self.datasets['num_valids'])
-                    # original_valid_batch_size = valid_dataloader.batch_sampler.batch_size
-                    # valid_dataloader.batch_sampler.batch_size = batch_size
-
                     valid_metrics = self.epoch_valid(self.info['loop']['epoch'], valid_dataloader, reduction='max')
-
-                    # valid_dataloader.batch_sampler.batch_size = original_valid_batch_size
                     metrics.append(valid_metrics)
                 loss = np.max([m['loss'] for m in metrics])
                 score = np.max([m['score'] for m in metrics])
@@ -250,11 +245,6 @@ class Model(LogicModel):
             original_labels = labels
             if not self.is_multiclass():
                 labels = labels.argmax(dim=-1)
-
-            # batch_size = examples.size(0)
-            # examples = torch.cat([examples, torch.flip(examples, dims=[-1])], dim=0)
-            # labels = torch.cat([labels, labels], dim=0)
-
             skeleton.nn.MoveToHook.to((examples, labels), self.device, self.is_half)
             logits, loss = model(examples, labels, tau=self.tau)
             loss.backward()
@@ -263,10 +253,6 @@ class Model(LogicModel):
             optimizer.update(maximum_epoch=max_epoch)
             optimizer.step()
             model.zero_grad()
-
-            # logits1, logits2 = torch.split(logits, batch_size, dim=0)
-            # logits = (logits1 + logits2) / 2.0
-
             logits, prediction = self.activation(logits.float())
             tpr, tnr, nbac = NBAC(prediction, original_labels.float())
             auc = AUC(logits, original_labels.float())
@@ -365,10 +351,6 @@ class Model(LogicModel):
         self.model_pred.eval()
         for step, (examples, labels) in enumerate(dataloader):
             self.use_test_time_augmentation = False
-            # self.use_test_time_augmentation = False
-            # examples = examples[0]
-            # skeleton.nn.MoveToHook.to((examples, labels), self.device, self.is_half)
-
             batch_size = examples.size(0)
 
             # Test-Time Augment flip
@@ -378,14 +360,14 @@ class Model(LogicModel):
             # skeleton.nn.MoveToHook.to((examples, labels), self.device, self.is_half)
             logits = self.model_pred(examples, tau=tau)
 
-            # avergae
+            # average
             if self.use_test_time_augmentation:
                 logits1, logits2 = torch.split(logits, batch_size, dim=0)
                 logits = (logits1 + logits2) / 2.0
 
             logits, prediction = self.activation(logits)
-
-            predictions.append(logits.detach().float().cpu().numpy())
-        # print(predictions)
-        predictions = np.concatenate(predictions, axis=0).astype(np.float)
+            predictions.append(logits.detach())
+        predictions = torch.cat(predictions).float().cpu().numpy()
+        #     predictions.append(logits.detach().float().cpu().numpy())
+        # predictions = np.concatenate(predictions, axis=0).astype(np.float)
         return predictions

@@ -8,7 +8,6 @@ import numpy as np
 import tensorflow as tf
 from ..nn.modules.hooks import MoveToHook
 
-
 LOGGER = logging.getLogger(__name__)
 
 
@@ -53,6 +52,7 @@ class TFDataset(Dataset):
 
     def scan(self, samples=1000000, with_tensors=False, is_batch=False, device=None, half=False):
         shapes, counts, tensors, counts_mean, counts_std = [], [], [], [], []
+        examples, labels = [], []
         for i in range(min(self.num_samples, samples)):
             try:
                 example, label = self.__getitem__(i)
@@ -68,27 +68,33 @@ class TFDataset(Dataset):
                 count_std = np.std(example[0], axis=(0, 1))
                 counts_mean.append(count_mean)
                 counts_std.append(count_std)
-            # print('-'*30)
-            # print('here')
-            # print(count_mean.shape)
-            # print('-'*30)
+            else:
+                examples.append(example)
+                labels.append(label)
             shapes.append(shape)
             counts.append(count)
 
-            if with_tensors:
-                example = torch.Tensor(example)
-                label = torch.Tensor(label)
-
-                example.data = example.data.to(device=device)
-                if half and example.is_floating_point():
-                    example.data = example.data.half()
-
-                label.data = label.data.to(device=device)
-                if half and label.is_floating_point():
-                    label.data = label.data.half()
-
-                tensors.append([example, label])
-
+            # if with_tensors:
+            #     example = torch.Tensor(example)
+            #     label = torch.Tensor(label)
+            #
+            #     example.data = example.data.to(device=device)
+            #     if half and example.is_floating_point():
+            #         example.data = example.data.half()
+            #
+            #     label.data = label.data.to(device=device)
+            #     if half and label.is_floating_point():
+            #         label.data = label.data.half()
+            #
+            #     tensors.append([example, label])
+        LOGGER.info('[%s] trans before', 'trans')
+        if with_tensors:
+            examples_t = torch.Tensor(np.concatenate(examples)).half().to(device=device)
+            labels_t = torch.Tensor(np.concatenate(labels)).half().to(device=device)
+            del examples
+            del labels
+            tensors = [examples_t,labels_t]
+        LOGGER.info('[%s] trans after', 'trans')
         shapes = np.array(shapes)
         counts = np.array(counts) if not is_batch else np.concatenate(counts)
         if not with_tensors:
@@ -161,5 +167,3 @@ def prefetch_dataset(dataset, num_workers=4, batch_size=32, device=None, half=Fa
         tensors = [t.half() if t.is_floating_point() else t for t in tensors]
 
     return torch.utils.data.TensorDataset(*tensors)
-
-
