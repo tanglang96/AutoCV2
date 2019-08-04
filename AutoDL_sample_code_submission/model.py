@@ -33,7 +33,6 @@ class Model(LogicModel):
         base_dir = os.path.dirname(os.path.abspath(__file__))
         in_channels = self.info['dataset']['shape'][-1]
         num_class = self.info['dataset']['num_class']
-        # torch.cuda.synchronize()
 
         LOGGER.info('[init] session')
         [t.join() for t in threads]
@@ -45,7 +44,6 @@ class Model(LogicModel):
         Network = ResNet18  # ResNet18  # BasicNet, SENet18, ResNet18
         self.model = Network(in_channels, num_class)
         self.model_pred = Network(in_channels, num_class).eval()
-        # torch.cuda.synchronize()
 
         LOGGER.info('[init] weight initialize')
         if Network in [ResNet18]:
@@ -55,13 +53,11 @@ class Model(LogicModel):
             self.model.init(model_dir=model_path, gain=1.0)
         else:
             self.model.init(gain=1.0)
-        # torch.cuda.synchronize()
 
         LOGGER.info('[init] copy to device')
         self.model = self.model.to(device=self.device).half()
         self.model_pred = self.model_pred.to(device=self.device).half()
         self.is_half = self.model._half
-        # torch.cuda.synchronize()
 
         LOGGER.info('[init] done.')
 
