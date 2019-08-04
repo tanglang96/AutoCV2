@@ -75,11 +75,17 @@ class Model(LogicModel):
         num_class = self.info['dataset']['num_class']
 
         epsilon = min(0.1, max(0.001, 0.001 * pow(num_class / 10, 2)))
-        self.model.norm = skeleton.nn.Normalize(self.info['dataset']['train']['data']['mean'],
-                                                self.info['dataset']['train']['data']['std'],
+        if sum(self.info['dataset']['train']['data']['mean']) / len(self.info['dataset']['train']['data']['mean']) > 1:
+            mean = 127.5
+            std = 63.75
+        else:
+            mean = 0.5
+            std = 0.25
+        self.model.norm = skeleton.nn.Normalize(mean,
+                                                std,
                                                 inplace=False).cuda().half()
-        self.model_pred.norm = skeleton.nn.Normalize(self.info['dataset']['train']['data']['mean'],
-                                                     self.info['dataset']['train']['data']['std'],
+        self.model_pred.norm = skeleton.nn.Normalize(mean,
+                                                     std,
                                                      inplace=False).cuda().half()
         if self.is_multiclass():
             self.model.loss_fn = torch.nn.BCEWithLogitsLoss(reduction='none')
@@ -254,20 +260,20 @@ class Model(LogicModel):
             optimizer.step()
             model.zero_grad()
             logits, prediction = self.activation(logits.float())
-            tpr, tnr, nbac = NBAC(prediction, original_labels.float())
+            # tpr, tnr, nbac = NBAC(prediction, original_labels.float())
             auc = AUC(logits, original_labels.float())
-
-            score = auc if self.hyper_params['conditions']['score_type'] == 'auc' else float(nbac.detach().float())
+            score = auc
+            # score = auc if self.hyper_params['conditions']['score_type'] == 'auc' else float(nbac.detach().float())
             metrics.append({
                 'loss': loss.detach().float().cpu(),
                 'score': score,
             })
 
-            LOGGER.debug(
-                '[train] [%02d] [%03d/%03d] loss:%.6f AUC:%.3f NBAC:%.3f tpr:%.3f tnr:%.3f, lr:%.8f',
-                epoch, step, num_steps, loss, auc, nbac, tpr, tnr,
-                optimizer.get_learning_rate()
-            )
+            # LOGGER.debug(
+            #     '[train] [%02d] [%03d/%03d] loss:%.6f AUC:%.3f NBAC:%.3f tpr:%.3f tnr:%.3f, lr:%.8f',
+            #     epoch, step, num_steps, loss, auc, nbac, tpr, tnr,
+            #     optimizer.get_learning_rate()
+            # )
 
         train_loss = np.average([m['loss'] for m in metrics])
         train_score = np.average([m['score'] for m in metrics])

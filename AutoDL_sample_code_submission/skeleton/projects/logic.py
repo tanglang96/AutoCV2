@@ -71,7 +71,7 @@ class LogicModel(Model):
         # TODO: adaptive logic for hyper parameter
         self.hyper_params = {
             'dataset': {
-                'train_info_sample': 256,
+                'train_info_sample': 64,   #initial 256
                 'cv_valid_ratio': 0.25,
                 'max_valid_count': 512,  # increase valid count
 
@@ -234,7 +234,7 @@ class LogicModel(Model):
                 with_tensors=True, is_batch=True,
                 device=self.device, half=self.is_half
             )
-            # tensors = [torch.cat(t, dim=0) for t in zip(*tensors)]
+            tensors = [torch.cat(t, dim=0) for t in zip(*tensors)]
             LOGGER.info('[%s] scan after', 'train')
 
             del tf_dataset
@@ -390,7 +390,7 @@ class LogicModel(Model):
                 with_tensors=True, is_batch=True,
                 device=self.device, half=self.is_half
             )
-            # tensors = [torch.cat(t, dim=0) for t in zip(*tensors)]
+            tensors = [torch.cat(t, dim=0) for t in zip(*tensors)]
             LOGGER.info('[%s] scan after', mode)
 
             del tf_dataset
