@@ -63,7 +63,7 @@ class LogicModel(Model):
             'dataset': {
                 'train_info_sample': 256,
                 'cv_valid_ratio': 0.1,
-                'max_valid_count': 128,
+                'max_valid_count': 512, # should be big enough to find the best model, but too big will slow down training speed
 
                 'max_size': 64,
                 'base': 16,  # input size should be multipliers of 16
@@ -193,7 +193,7 @@ class LogicModel(Model):
         enough_image = num_images > 5000
         if not enough_image:
             preprocessor1 = get_tf_resize(input_shape[0], input_shape[1])
-            preprocessor2 = get_tf_to_tensor(is_random_flip=False)
+            preprocessor2 = get_tf_to_tensor(is_random_flip=True)
             preprocessor = lambda *tensor: preprocessor2(preprocessor1(*tensor))
 
             batchsize = 128
@@ -284,7 +284,7 @@ class LogicModel(Model):
                 'num_valids': num_valids
             }
         else:
-            # dataset = dataset.shuffle(buffer_size=num_valids * 4, reshuffle_each_iteration=False)
+            dataset = dataset.shuffle(buffer_size=num_valids * 4, reshuffle_each_iteration=True)   # random here is important, reshuffle seems useless
             train = dataset.skip(num_valids)
             valid = dataset.take(num_valids)
             self.datasets = {
