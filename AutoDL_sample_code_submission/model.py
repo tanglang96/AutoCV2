@@ -9,7 +9,7 @@ import torchvision as tv
 import numpy as np
 
 import skeleton
-from architectures.resnet import ResNet18
+from skeleton.nn.resnet import ResNet18
 from skeleton.projects import LogicModel, get_logger
 from skeleton.projects.others import NBAC, AUC
 
