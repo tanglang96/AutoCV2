@@ -56,7 +56,6 @@ class ResNet18(models.ResNet):
         self.fc = torch.nn.Linear(512 * Block.expansion, num_classes, bias=False)
         self._half = False
         self._class_normalize = True
-        self.avgpool = nn.AdaptiveAvgPool2d(1)
 
     def init(self, model_dir, gain=1.):
         sd = model_zoo.load_url(model_urls['resnet18'], model_dir=model_dir)

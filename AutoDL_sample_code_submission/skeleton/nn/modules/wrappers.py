@@ -41,39 +41,32 @@ class CopyChannels(torch.nn.Module):
         return torch.cat([x for _ in range(self.multiple)], dim=self.dim)
 
 
-# class Normalize(torch.nn.Module):
-#     def __init__(self, mean=0.5, std=0.25, inplace=False):
-#         super(Normalize, self).__init__()
-#         self.register_buffer('mean', torch.tensor(mean, dtype=torch.float32)[None, :, None, None])
-#         self.register_buffer('std', torch.tensor(std, dtype=torch.float32)[None, :, None, None])
-#         # self.register_buffer('mean', torch.tensor([mean], dtype=torch.float32))
-#         # self.register_buffer('std', torch.tensor([std], dtype=torch.float32))
-#         self.mean_data = mean
-#         self.std_data = std
-#         self.inplace = inplace
-#
-#     def forward(self, x):
-#         if not self.inplace:
-#             x = x.clone()
-#         # print('=' * 30)
-#         # print(self.mean.shape)
-#         # print('=' * 30)
-#         x.sub_(self.mean).div_(self.std)
-#         return x
-
 class Normalize(torch.nn.Module):
     def __init__(self, mean, std, inplace=False):
         super(Normalize, self).__init__()
-        self.register_buffer('mean', torch.tensor([mean], dtype=torch.float32)[None, :, None, None])
-        self.register_buffer('std', torch.tensor([std], dtype=torch.float32)[None, :, None, None])
+        self.register_buffer('mean', torch.tensor(mean, dtype=torch.float32)[None, :, None, None])
+        self.register_buffer('std', torch.tensor(std, dtype=torch.float32)[None, :, None, None])
+        # self.register_buffer('mean', torch.tensor([mean], dtype=torch.float32))
+        # self.register_buffer('std', torch.tensor([std], dtype=torch.float32))
+        self.mean_data = mean
+        self.std_data = std
         self.inplace = inplace
 
     def forward(self, x):
         if not self.inplace:
             x = x.clone()
-
+        # print('=' * 30)
+        # print(self.mean.shape)
+        # print('=' * 30)
         x.sub_(self.mean).div_(self.std)
+        # print('=' * 30)
+        # print(x.shape)
+        # print(self.mean_data)
+        # print(self.std_data)
+        # print('=' * 30)
+        # x = transforms.Normalize(mean=self.mean_data, std=self.std_data)(x)
         return x
+
 
 class Permute(torch.nn.Module):
     def __init__(self, *dims):

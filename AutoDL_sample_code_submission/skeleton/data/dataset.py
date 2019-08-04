@@ -40,19 +40,8 @@ class TFDataset(Dataset):
 
         return example, label
 
-    def __call__(self, *args, **kwargs):
-        session = self.session if self.session is not None else tf.Session()
-        try:
-            example, label = session.run(self.next_element)
-        except tf.errors.OutOfRangeError:
-            self.reset()
-            raise StopIteration
-
-        return example, label
-
     def scan(self, samples=1000000, with_tensors=False, is_batch=False, device=None, half=False):
         shapes, counts, tensors, counts_mean, counts_std = [], [], [], [], []
-        examples, labels = [], []
         for i in range(min(self.num_samples, samples)):
             try:
                 example, label = self.__getitem__(i)
@@ -64,14 +53,14 @@ class TFDataset(Dataset):
             shape = example.shape
             count = np.sum(label, axis=None if not is_batch else -1)
             if not with_tensors:
-                if i < 2:
-                    count_mean = np.mean(example[0], axis=(0, 1))
-                    count_std = np.std(example[0], axis=(0, 1))
-                    counts_mean.append(count_mean)
-                    counts_std.append(count_std)
-            else:
-                examples.append(example)
-                labels.append(label)
+                count_mean = np.mean(example[0], axis=(0, 1))
+                count_std = np.std(example[0], axis=(0, 1))
+                counts_mean.append(count_mean)
+                counts_std.append(count_std)
+            # print('-'*30)
+            # print('here')
+            # print(count_mean.shape)
+            # print('-'*30)
             shapes.append(shape)
             counts.append(count)
 
@@ -88,22 +77,28 @@ class TFDataset(Dataset):
                     label.data = label.data.half()
 
                 tensors.append([example, label])
-        # LOGGER.info('[%s] trans before', 'trans')
-        # if with_tensors:
-        #     examples_t = torch.Tensor(np.concatenate(examples)).half().to(device=device)
-        #     labels_t = torch.Tensor(np.concatenate(labels)).half().to(device=device)
-        #     del examples
-        #     del labels
-        #     tensors = [examples_t,labels_t]
-        # LOGGER.info('[%s] trans after', 'trans')
+
         shapes = np.array(shapes)
         counts = np.array(counts) if not is_batch else np.concatenate(counts)
+        # print('-' * 30)
+        # print('here')
+        # print(np.array(counts_mean).shape)
+        # print('-' * 30)
         if not with_tensors:
             counts_mean = np.mean(np.array(counts_mean), axis=0).tolist()
             counts_std = np.mean(np.array(counts_std), axis=0).tolist()
+            # if len(counts_mean) == 1:
+            #     counts_mean = counts_mean * 3
+            # if len(counts_std) == 1:
+            #     counts_std = counts_std * 3
             print('=' * 50)
             print(counts_mean)
             print('=' * 50)
+        # print('-' * 30)
+        # print(len(counts_mean))
+        # print(counts_mean)
+        # print(counts_std)
+        # print('-' * 30)
         info = {
             'count': len(counts),
             'is_multiclass': counts.max() > 1.0,

@@ -7,9 +7,9 @@ import tensorflow as tf
 import torch
 import torchvision as tv
 import numpy as np
-import torch.nn as nn
+
 import skeleton
-from architectures.resnet import ResNet18, ResNet18_Small
+from architectures.resnet import ResNet18
 from skeleton.projects import LogicModel, get_logger
 from skeleton.projects.others import NBAC, AUC
 
@@ -42,23 +42,17 @@ class Model(LogicModel):
         self.session = tf.Session()
 
         LOGGER.info('[init] Model')
-        if self.info['dataset']['size'] < 5000:
-            Network = ResNet18_Small
-        else:
-            Network = ResNet18  # ResNet18  # BasicNet, SENet18, ResNet18
+        Network = ResNet18  # ResNet18  # BasicNet, SENet18, ResNet18
         self.model = Network(in_channels, num_class)
         self.model_pred = Network(in_channels, num_class).eval()
         # torch.cuda.synchronize()
 
         LOGGER.info('[init] weight initialize')
-        if Network in [ResNet18, ResNet18_Small]:
-            # model_path = os.path.join(base_dir, 'models/resnet18-5c106cde.pth')
+        if Network in [ResNet18]:
             model_path = os.path.join(base_dir, 'models')
             LOGGER.info('model path: %s', model_path)
 
             self.model.init(model_dir=model_path, gain=1.0)
-            self.model_pred.init(model_dir=model_path, gain=1.0)
-
         else:
             self.model.init(gain=1.0)
         # torch.cuda.synchronize()
@@ -75,18 +69,12 @@ class Model(LogicModel):
         num_class = self.info['dataset']['num_class']
 
         epsilon = min(0.1, max(0.001, 0.001 * pow(num_class / 10, 2)))
-        if sum(self.info['dataset']['train']['data']['mean']) / len(self.info['dataset']['train']['data']['mean']) > 1:
-            mean = 127.5
-            std = 63.75
-        else:
-            mean = 0.5
-            std = 0.25
-        self.model.norm = skeleton.nn.Normalize(mean,
-                                                std,
-                                                inplace=False).cuda().half()
-        self.model_pred.norm = skeleton.nn.Normalize(mean,
-                                                     std,
-                                                     inplace=False).cuda().half()
+        self.model.norm = skeleton.nn.Normalize(self.info['dataset']['train']['data']['mean'],
+                                                   self.info['dataset']['train']['data']['std'],
+                                                   inplace=False).cuda().half()
+        self.model_pred.norm = skeleton.nn.Normalize(self.info['dataset']['train']['data']['mean'],
+                                                        self.info['dataset']['train']['data']['std'],
+                                                        inplace=False).cuda().half()
         if self.is_multiclass():
             self.model.loss_fn = torch.nn.BCEWithLogitsLoss(reduction='none')
             # self.model.loss_fn = skeleton.nn.BinaryCrossEntropyLabelSmooth(num_class, epsilon=epsilon, reduction='none')
@@ -100,13 +88,11 @@ class Model(LogicModel):
             LOGGER.info('[update_model] %s (tau:%f, epsilon:%f)', self.model.loss_fn.__class__.__name__, self.tau,
                         epsilon)
         self.model_pred.loss_fn = self.model.loss_fn
-        if self.info['dataset']['size'] < 5000:  # small dataset will cause overfitting
-            self.model.fc.dropout = nn.Dropout(p=0.2)
+
         self.init_opt()
         LOGGER.info('[update] done.')
 
-    def init_opt(self, init_lr=0.025):
-        self.init_lr = init_lr
+    def init_opt(self):
         steps_per_epoch = self.hyper_params['dataset']['steps_per_epoch']
         batch_size = self.hyper_params['dataset']['batch_size']
 
@@ -116,8 +102,8 @@ class Model(LogicModel):
         lr_multiplier = max(1.0, batch_size / 32)
         scheduler_lr = skeleton.optim.gradual_warm_up(
             skeleton.optim.get_reduce_on_plateau_scheduler(
-                init_lr * lr_multiplier / warmup_multiplier,  # initial 0.025
-                patience=10, factor=.5, metric_name='train_loss'  # initial patience=10 factor=0.5
+                0.025 * lr_multiplier / warmup_multiplier,
+                patience=10, factor=.5, metric_name='train_loss'
             ),
             warm_up_epoch=5,
             multiplier=warmup_multiplier
@@ -169,11 +155,11 @@ class Model(LogicModel):
             original_train_policy = self.dataloaders['train'].dataset.transform.transforms
             policy = skeleton.data.augmentations.autoaug_policy()
 
-            num_policy_search = 50
+            num_policy_search = 100
             num_sub_policy = 3
             num_select_policy = 3
             searched_policy = []
-            for policy_search in range(num_policy_search):  # random search num_policy_search times
+            for policy_search in range(num_policy_search):
                 selected_idx = np.random.choice(list(range(len(policy))), num_sub_policy)
                 selected_policy = [policy[i] for i in selected_idx]
                 self.dataloaders['valid'].dataset.transform.transforms = original_valid_policy + [
@@ -190,7 +176,12 @@ class Model(LogicModel):
                 for policy_eval in range(num_sub_policy):
                     valid_dataloader = self.build_or_get_dataloader('valid', self.datasets['valid'],
                                                                     self.datasets['num_valids'])
+                    # original_valid_batch_size = valid_dataloader.batch_sampler.batch_size
+                    # valid_dataloader.batch_sampler.batch_size = batch_size
+
                     valid_metrics = self.epoch_valid(self.info['loop']['epoch'], valid_dataloader, reduction='max')
+
+                    # valid_dataloader.batch_sampler.batch_size = original_valid_batch_size
                     metrics.append(valid_metrics)
                 loss = np.max([m['loss'] for m in metrics])
                 score = np.max([m['score'] for m in metrics])
@@ -205,7 +196,6 @@ class Model(LogicModel):
 
             flatten = lambda l: [item for sublist in l for item in sublist]
 
-            # random sample non-duplicate policy from num_select_policy best(max score on valid_loader) policy list as training policy
             policy_sorted_index = np.argsort([p['score'] for p in searched_policy])[::-1][:num_select_policy]
             policy = flatten([searched_policy[idx]['policy'] for idx in policy_sorted_index])
             policy = skeleton.data.augmentations.remove_duplicates(policy)
@@ -218,7 +208,7 @@ class Model(LogicModel):
                 lambda t: t.cpu().float() if isinstance(t, torch.Tensor) else torch.Tensor(t),
                 tv.transforms.ToPILImage(),
                 skeleton.data.augmentations.Augmentation(
-                    policy  # actually a policy list, every time random sample one policy
+                    policy
                 ),
                 tv.transforms.ToTensor(),
                 lambda t: t.to(device=self.device).half()
@@ -251,6 +241,11 @@ class Model(LogicModel):
             original_labels = labels
             if not self.is_multiclass():
                 labels = labels.argmax(dim=-1)
+
+            # batch_size = examples.size(0)
+            # examples = torch.cat([examples, torch.flip(examples, dims=[-1])], dim=0)
+            # labels = torch.cat([labels, labels], dim=0)
+
             skeleton.nn.MoveToHook.to((examples, labels), self.device, self.is_half)
             logits, loss = model(examples, labels, tau=self.tau)
             loss.backward()
@@ -259,21 +254,25 @@ class Model(LogicModel):
             optimizer.update(maximum_epoch=max_epoch)
             optimizer.step()
             model.zero_grad()
+
+            # logits1, logits2 = torch.split(logits, batch_size, dim=0)
+            # logits = (logits1 + logits2) / 2.0
+
             logits, prediction = self.activation(logits.float())
-            # tpr, tnr, nbac = NBAC(prediction, original_labels.float())
+            tpr, tnr, nbac = NBAC(prediction, original_labels.float())
             auc = AUC(logits, original_labels.float())
-            score = auc
-            # score = auc if self.hyper_params['conditions']['score_type'] == 'auc' else float(nbac.detach().float())
+
+            score = auc if self.hyper_params['conditions']['score_type'] == 'auc' else float(nbac.detach().float())
             metrics.append({
                 'loss': loss.detach().float().cpu(),
                 'score': score,
             })
 
-            # LOGGER.debug(
-            #     '[train] [%02d] [%03d/%03d] loss:%.6f AUC:%.3f NBAC:%.3f tpr:%.3f tnr:%.3f, lr:%.8f',
-            #     epoch, step, num_steps, loss, auc, nbac, tpr, tnr,
-            #     optimizer.get_learning_rate()
-            # )
+            LOGGER.debug(
+                '[train] [%02d] [%03d/%03d] loss:%.6f AUC:%.3f NBAC:%.3f tpr:%.3f tnr:%.3f, lr:%.8f',
+                epoch, step, num_steps, loss, auc, nbac, tpr, tnr,
+                optimizer.get_learning_rate()
+            )
 
         train_loss = np.average([m['loss'] for m in metrics])
         train_score = np.average([m['score'] for m in metrics])
@@ -356,7 +355,9 @@ class Model(LogicModel):
         predictions = []
         self.model_pred.eval()
         for step, (examples, labels) in enumerate(dataloader):
-            self.use_test_time_augmentation = False
+            # examples = examples[0]
+            # skeleton.nn.MoveToHook.to((examples, labels), self.device, self.is_half)
+
             batch_size = examples.size(0)
 
             # Test-Time Augment flip
@@ -366,14 +367,14 @@ class Model(LogicModel):
             # skeleton.nn.MoveToHook.to((examples, labels), self.device, self.is_half)
             logits = self.model_pred(examples, tau=tau)
 
-            # average
+            # avergae
             if self.use_test_time_augmentation:
                 logits1, logits2 = torch.split(logits, batch_size, dim=0)
                 logits = (logits1 + logits2) / 2.0
 
             logits, prediction = self.activation(logits)
-            predictions.append(logits.detach())
-        predictions = torch.cat(predictions).float().cpu().numpy()
-        #     predictions.append(logits.detach().float().cpu().numpy())
-        # predictions = np.concatenate(predictions, axis=0).astype(np.float)
+
+            predictions.append(logits.detach().float().cpu().numpy())
+
+        predictions = np.concatenate(predictions, axis=0).astype(np.float)
         return predictions
