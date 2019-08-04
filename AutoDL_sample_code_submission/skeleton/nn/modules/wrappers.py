@@ -46,8 +46,6 @@ class Normalize(torch.nn.Module):
         super(Normalize, self).__init__()
         self.register_buffer('mean', torch.tensor(mean, dtype=torch.float32)[None, :, None, None])
         self.register_buffer('std', torch.tensor(std, dtype=torch.float32)[None, :, None, None])
-        # self.register_buffer('mean', torch.tensor([mean], dtype=torch.float32))
-        # self.register_buffer('std', torch.tensor([std], dtype=torch.float32))
         self.mean_data = mean
         self.std_data = std
         self.inplace = inplace
@@ -55,16 +53,7 @@ class Normalize(torch.nn.Module):
     def forward(self, x):
         if not self.inplace:
             x = x.clone()
-        # print('=' * 30)
-        # print(self.mean.shape)
-        # print('=' * 30)
         x.sub_(self.mean).div_(self.std)
-        # print('=' * 30)
-        # print(x.shape)
-        # print(self.mean_data)
-        # print(self.std_data)
-        # print('=' * 30)
-        # x = transforms.Normalize(mean=self.mean_data, std=self.std_data)(x)
         return x
 
 
@@ -187,7 +176,6 @@ class DropPath(torch.nn.Module):
 
     def forward(self, x):
         if self.training and self.drop_prob > 0.:
-            # shape = list(x.shape[:2]) + [1 for _ in x.shape[2:]]
             shape = list(x.shape[:1]) + [1 for _ in x.shape[1:]]
             keep_prob = 1. - self.drop_prob
             mask = torch.cuda.FloatTensor(*shape).bernoulli_(keep_prob)

@@ -6,7 +6,6 @@ import torch
 from torch.utils.data import Dataset
 import numpy as np
 import tensorflow as tf
-from ..nn.modules.hooks import MoveToHook
 
 LOGGER = logging.getLogger(__name__)
 
@@ -57,10 +56,6 @@ class TFDataset(Dataset):
                 count_std = np.std(example[0], axis=(0, 1))
                 counts_mean.append(count_mean)
                 counts_std.append(count_std)
-            # print('-'*30)
-            # print('here')
-            # print(count_mean.shape)
-            # print('-'*30)
             shapes.append(shape)
             counts.append(count)
 
@@ -80,25 +75,10 @@ class TFDataset(Dataset):
 
         shapes = np.array(shapes)
         counts = np.array(counts) if not is_batch else np.concatenate(counts)
-        # print('-' * 30)
-        # print('here')
-        # print(np.array(counts_mean).shape)
-        # print('-' * 30)
         if not with_tensors:
             counts_mean = np.mean(np.array(counts_mean), axis=0).tolist()
             counts_std = np.mean(np.array(counts_std), axis=0).tolist()
-            # if len(counts_mean) == 1:
-            #     counts_mean = counts_mean * 3
-            # if len(counts_std) == 1:
-            #     counts_std = counts_std * 3
-            print('=' * 50)
-            print(counts_mean)
-            print('=' * 50)
-        # print('-' * 30)
-        # print(len(counts_mean))
-        # print(counts_mean)
-        # print(counts_std)
-        # print('-' * 30)
+
         info = {
             'count': len(counts),
             'is_multiclass': counts.max() > 1.0,

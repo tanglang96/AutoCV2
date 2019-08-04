@@ -27,39 +27,24 @@ class ResNet18(models.ResNet):
         Block = BasicBlock
         super(ResNet18, self).__init__(Block, [2, 2, 2, 2], num_classes=num_classes, **kwargs)  # resnet18
         self.norm = None
-        # self.normalize_input = skeleton.nn.Normalize(self.mean, self.std, inplace=False),
         if in_channels == 3:
             self.stem = torch.nn.Sequential(
-                # skeleton.nn.Normalize(self.mean, self.std, inplace=False),
-                # skeleton.nn.Permute(0, 3, 1, 2),
-                # skeleton.nn.Cutout(),
-                # torch.nn.BatchNorm2d(in_channels),
             )
         elif in_channels == 1:
             self.stem = torch.nn.Sequential(
-                # skeleton.nn.Normalize(self.mean, self.std, inplace=False),
-                # skeleton.nn.Permute(0, 3, 1, 2),
-                # skeleton.nn.Cutout(),
-                # torch.nn.BatchNorm2d(in_channels),
                 skeleton.nn.CopyChannels(3),
             )
         else:
             self.stem = torch.nn.Sequential(
-                # skeleton.nn.Normalize(self.mean, self.std, inplace=False),
-                # skeleton.nn.Permute(0, 3, 1, 2),
-                # skeleton.nn.Cutout(),
-                # torch.nn.BatchNorm2d(in_channels),
                 torch.nn.Conv2d(in_channels, 3, kernel_size=3, stride=1, padding=1, bias=False)
             )
 
-        # self.self.conv1 = nn.Conv2d(3, 64, kernel_size=7, stride=2, padding=3, bias=False)
         self.fc = torch.nn.Linear(512 * Block.expansion, num_classes, bias=False)
         self._half = False
         self._class_normalize = True
 
     def init(self, model_dir, gain=1.):
         sd = model_zoo.load_url(model_urls['resnet18'], model_dir=model_dir)
-        # sd = model_zoo.load_url(model_urls['resnet34'], model_dir='./models/')
         del sd['fc.weight']
         del sd['fc.bias']
         self.load_state_dict(sd, strict=False)
@@ -67,10 +52,8 @@ class ResNet18(models.ResNet):
         for idx in range(len(self.stem)):
             m = self.stem[idx]
             if hasattr(m, 'weight'):
-                # torch.nn.init.kaiming_normal_(self.stem.weight, mode='fan_in', nonlinearity='linear')
                 torch.nn.init.xavier_normal_(m.weight, gain=gain)
                 LOGGER.debug('initialize stem weight')
-        # torch.nn.init.kaiming_uniform_(self.fc.weight, mode='fan_in', nonlinearity='sigmoid')
         torch.nn.init.xavier_uniform_(self.fc.weight, gain=gain)
         LOGGER.debug('initialize classifier weight')
         for m in self.layer4.modules():
@@ -121,7 +104,6 @@ class ResNet18(models.ResNet):
         return logits, loss
 
     def half(self):
-        # super(BasicNet, self).half()
         for module in self.modules():
             if len([c for c in module.children()]) > 0:
                 continue

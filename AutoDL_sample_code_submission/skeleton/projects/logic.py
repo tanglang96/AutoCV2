@@ -80,7 +80,7 @@ class LogicModel(Model):
             'conditions': {
                 'score_type': 'auc',
                 'early_epoch': 1,
-                'skip_valid_score_threshold': 0.90,  # if bigger then 1.0 is not use
+                'skip_valid_score_threshold': 0.90,  # if bigger than 1.0 is not use
                 'skip_valid_after_test': min(10, max(3, int(self.info['dataset']['size'] // 1000))),
                 'test_after_at_least_seconds': 1,
                 'test_after_at_least_seconds_max': 90,
@@ -142,7 +142,7 @@ class LogicModel(Model):
 
         num_images = self.info['dataset']['size']
 
-        # split train/valid
+        # split train/valid, validset num is important
         num_valids = int(min(num_images * self.hyper_params['dataset']['cv_valid_ratio'],
                              self.hyper_params['dataset']['max_valid_count']))
         num_trains = num_images - num_valids
@@ -157,7 +157,6 @@ class LogicModel(Model):
         del sample
         LOGGER.info('[%s] scan after', 'sample')
 
-        # input_shape = [min(s, self.hyper_params['dataset']['max_size']) for s in self.info['dataset']['shape']]
         height, width, channels = self.info['dataset']['train']['example']['shape'][1:]
         aspect_ratio = width / height
 
@@ -192,7 +191,7 @@ class LogicModel(Model):
         batch_size = self.hyper_params['dataset']['batch_size']
 
         enough_image = num_images > 5000
-        if not enough_image:
+        if not enough_image:    # when not enough images, scan tensors and merge
             preprocessor1 = get_tf_resize(input_shape[0], input_shape[1])
             preprocessor2 = get_tf_to_tensor(is_random_flip=True)
             preprocessor = lambda *tensor: preprocessor2(preprocessor1(*tensor))
@@ -209,10 +208,6 @@ class LogicModel(Model):
             dataset = skeleton.data.TFDataset(self.session, tf_dataset, num_images)
 
             LOGGER.info('[%s] scan before', 'train')
-            # self.info['dataset']['train'], tensors = dataset.scan(
-            #     with_tensors=True, is_batch=True,
-            #     device=self.device, half=self.is_half
-            # )
             _, tensors = dataset.scan(
                 with_tensors=True, is_batch=True,
                 device=self.device, half=self.is_half
@@ -243,17 +238,12 @@ class LogicModel(Model):
             sss = sss.split(index, labels)
             train_idx, valid_idx = next(sss)
 
-            # random.shuffle(index)
-            # train_idx = index[num_valids:]
-            # valid_idx = index[:num_valids]
-
             train_dataset = torch.utils.data.Subset(dataset, train_idx)
             valid_dataset = torch.utils.data.Subset(dataset, valid_idx)
 
             # Stratified Shuffle
             labels = [labels[idx] for idx in train_idx]
             sampler = skeleton.data.StratifiedSampler(labels)
-            # sampler = skeleton.data.InfiniteSampler(train_dataset, shuffle=True)
 
             transform = tv.transforms.Compose([
                 skeleton.data.RandomFlip(p=0.5),
@@ -315,9 +305,7 @@ class LogicModel(Model):
                     lambda *x: (preprocessor1(x[0]), x[1]),
                     num_parallel_calls=tf.data.experimental.AUTOTUNE
                 )
-
                 dataset = dataset.cache()
-
                 dataset = dataset.apply(
                     tf.data.experimental.shuffle_and_repeat(buffer_size=batch_size * 4)
                 )
@@ -336,16 +324,6 @@ class LogicModel(Model):
                     lambda *x: (preprocessor(x[0]), x[1]),
                     num_parallel_calls=tf.data.experimental.AUTOTUNE
                 ).prefetch(buffer_size=batch_size * 3)
-
-            # dataset = dataset.apply(
-            #     tf.data.experimental.map_and_batch(
-            #         map_func=lambda *x: (preprocessor(x[0]), x[1]),
-            #         batch_size=batch_size,
-            #         drop_remainder=False,
-            #         num_parallel_calls=tf.data.experimental.AUTOTUNE
-            #     )
-            # ).prefetch(tf.data.experimental.AUTOTUNE)
-            # batch_size = None
 
             dataset = skeleton.data.TFDataset(self.session, dataset, num_items)
 
@@ -399,32 +377,6 @@ class LogicModel(Model):
                 shuffle=False, drop_last=False, num_workers=0, pin_memory=False
             )
             self.info['condition']['first'][mode] = False
-        # elif mode == 'test':
-        #     batch_size = self.hyper_params['dataset']['batch_size_test']
-        #     input_shape = self.hyper_params['dataset']['input']
-        #     preprocessor1 = get_tf_resize(input_shape[0], input_shape[1])
-        #     preprocessor2 = get_tf_to_tensor(is_random_flip=False)
-        #     preprocessor = lambda *tensor: preprocessor2(preprocessor1(*tensor))
-        #
-        #     tf_dataset = dataset.apply(
-        #         tf.data.experimental.map_and_batch(
-        #             map_func=lambda *x: (preprocessor(x[0]), x[1]),
-        #             batch_size=batch_size,
-        #             drop_remainder=False,
-        #             num_parallel_calls=tf.data.experimental.AUTOTUNE
-        #         )
-        #     ).cache().repeat().prefetch(buffer_size=2)
-        #
-        #     steps = num_items // batch_size + (1 if num_items % batch_size > 0 else 0)
-        #     dataset = skeleton.data.TFDataset(self.session, tf_dataset, steps)
-        #
-        #     self.dataloaders[mode] = torch.utils.data.DataLoader(
-        #         dataset,
-        #         batch_size=1, #self.hyper_params['dataset']['batch_size_test'],
-        #         shuffle=False, drop_last=False, num_workers=0, pin_memory=True
-        #     )
-        #     self.info['condition']['first'][mode] = False
-
         LOGGER.debug('[dataloader] %s build end', mode)
         return self.dataloaders[mode]
 
@@ -451,17 +403,17 @@ class LogicModel(Model):
         LOGGER.debug('[CONDITION] best (epoch:%04d loss:%.2f score:%.2f) lr:%.8f time delta:%.2f',
                      best_epoch, best_loss, best_score, lr, consume)
 
-        if self.info['loop']['epoch'] <= self.hyper_params['conditions']['early_epoch']:
+        if self.info['loop']['epoch'] <= self.hyper_params['conditions']['early_epoch']:    # when 1'st epoch finish, break and test
             LOGGER.info('[BREAK] early %d epoch', self.hyper_params['conditions']['early_epoch'])
             return True
 
-        if best_score > 0.995:
+        if best_score > 0.995:  # if score is high enough, break
             LOGGER.info('[BREAK] achieve best score %f', best_score)
             return True
 
         if consume > self.hyper_params['conditions']['test_after_at_least_seconds'] and \
                         self.checkpoints[best_idx]['epoch'] > self.info['loop']['epoch'] - inner_epoch and \
-                        best_score > self.info['loop']['best_score'] * 1.001:
+                        best_score > self.info['loop']['best_score'] * 1.001:   # when consume too much time, and got best score in this loop, increase time it could consume
             # increase hyper param
             self.hyper_params['conditions']['test_after_at_least_seconds'] = min(
                 self.hyper_params['conditions']['test_after_at_least_seconds_max'],
@@ -473,21 +425,21 @@ class LogicModel(Model):
             LOGGER.info('[BREAK] found best model (score:%f)', best_score)
             return True
 
-        if lr < self.hyper_params['conditions']['min_lr']:
+        if lr < self.hyper_params['conditions']['min_lr']:  # lr is too small
             LOGGER.info('[BREAK] too small lr (lr:%f < %f)', lr, self.hyper_params['conditions']['min_lr'])
             return True
 
         early_term_budget = 3 * 60
         expected_more_time = (self.timers['test'].step_time + (self.timers['train'].step_time * 2)) * 1.5
         if remaining_time_budget is not None and \
-                                remaining_time_budget - early_term_budget < expected_more_time:
+                                remaining_time_budget - early_term_budget < expected_more_time: # time left is not enough for a complete train epoch
             LOGGER.info('[BREAK] not enough time to train (remain:%f need:%f)', remaining_time_budget,
                         expected_more_time)
             return True
 
         if self.info['loop']['epoch'] >= 20 and \
                         inner_epoch > self.hyper_params['dataset']['max_epoch'] * self.hyper_params['conditions'][
-                    'max_inner_loop_ratio']:
+                    'max_inner_loop_ratio']:    # train too much epochs
             LOGGER.info('[BREAK] cannot found best model in too many epoch')
             return True
 
@@ -496,7 +448,7 @@ class LogicModel(Model):
     def terminate_train_loop_condition(self, remaining_time_budget=None, inner_epoch=0):
         best_idx = np.argmax(np.array([c['valid']['score'] for c in self.checkpoints]))
         best_score = self.checkpoints[best_idx]['valid']['score']
-        if best_score > 0.995:
+        if best_score > 0.995:  # achieve high enough score
             LOGGER.info('[TERMINATE] achieve best score %f', best_score)
             self.info['terminate'] = True
             self.done_training = True
@@ -505,7 +457,7 @@ class LogicModel(Model):
         early_term_budget = 3 * 60
         expected_more_time = (self.timers['test'].step_time + (self.timers['train'].step_time * 2)) * 1.5
         if remaining_time_budget is not None and \
-                                remaining_time_budget - early_term_budget < expected_more_time:
+                                remaining_time_budget - early_term_budget < expected_more_time: # not enough time for a full train
             LOGGER.info('[TERMINATE] not enough time to train (remain:%f need:%f)', remaining_time_budget,
                         expected_more_time)
             self.info['terminate'] = True
@@ -517,13 +469,13 @@ class LogicModel(Model):
         threshold = self.hyper_params['conditions']['threshold_valid_score_diff']
         if 1e-8 < diff and diff < threshold and \
                         self.info['loop']['epoch'] >= 20:
-            LOGGER.info('[TERMINATE] too small score change (diff:%f < %f)', diff, threshold)
+            LOGGER.info('[TERMINATE] too small score change (diff:%f < %f)', diff, threshold)   # enough epochs and little diff
             done = True if self.info['terminate'] else False
             self.info['terminate'] = True
             self.done_training = done
             return True
 
-        if self.optimizer.get_learning_rate() < self.hyper_params['conditions']['min_lr']:
+        if self.optimizer.get_learning_rate() < self.hyper_params['conditions']['min_lr']:  # lr is too small
             LOGGER.info('[TERMINATE] lr=%f', self.optimizer.get_learning_rate())
             done = True if self.info['terminate'] else False
             self.info['terminate'] = True
@@ -532,7 +484,7 @@ class LogicModel(Model):
 
         if self.info['loop']['epoch'] >= 20 and \
                         inner_epoch > self.hyper_params['dataset']['max_epoch'] * self.hyper_params['conditions'][
-                    'max_inner_loop_ratio']:
+                    'max_inner_loop_ratio']:    # too much epochs
             LOGGER.info('[TERMINATE] cannot found best model in too many epoch')
             done = True if self.info['terminate'] else False
             self.info['terminate'] = True
@@ -617,17 +569,6 @@ class LogicModel(Model):
 
             self.timers['train']('end')
 
-        # if 'test' in self.dataloaders and self.dataloaders['test'] is not None and \
-        #     not is_skip_valid:
-        #     self.prediction(self.dataloaders['test'])
-        #     for step in range(3):
-        #         test_metric = self.epoch_train(self.info['loop']['epoch'], self.dataloaders['test'])
-        #         LOGGER.info(
-        #             '[train] [%02d] [%02d/%02d] [finetune] loss:%.3f score:%.3f',
-        #             self.info['loop']['epoch'], step, 3, test_metric['loss'], test_metric['score'],
-        #         )
-        # self.timers['train']('finetune')
-
         remaining_time_budget -= self.timers['train'].step_time
         self.terminate_train_loop_condition(remaining_time_budget, inner_epoch)
 
@@ -641,7 +582,6 @@ class LogicModel(Model):
             metrics['train']['loss'], metrics['valid']['loss'], metrics['train']['score'], metrics['valid']['score'],
             self.optimizer.get_learning_rate()
         )
-        # LOGGER.info('[train] [%02d] Timer:%s', self.info['loop']['epoch'], self.timers['train'])
 
     def test(self, dataset, remaining_time_budget=None):
         self.timers['test']('start', exclude_total=True, reset_step=True)
@@ -659,5 +599,4 @@ class LogicModel(Model):
             self.info['loop']['epoch'], self.info['loop']['test'], remaining_time_budget, self.get_total_time(),
             self.timers['test'].step_time,
         )
-        # LOGGER.debug('[test ] [%02d] Timer:%s', self.info['loop']['epoch'], self.timers['test'])
         return rv
