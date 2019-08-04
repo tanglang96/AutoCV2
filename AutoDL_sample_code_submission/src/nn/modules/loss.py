@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-# pylint: disable=arguments-differ, abstract-method
 from __future__ import absolute_import
 import logging
 

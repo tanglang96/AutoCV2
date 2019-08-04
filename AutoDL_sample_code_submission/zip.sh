@@ -1,1 +1,1 @@
-zip -r submit.zip *
+zip -r code.zip *

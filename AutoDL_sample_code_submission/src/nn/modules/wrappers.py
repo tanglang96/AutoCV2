@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-# pylint: disable=arguments-differ
 from __future__ import absolute_import
 import logging
 from functools import wraps
@@ -7,7 +6,6 @@ from collections import OrderedDict
 
 import torch
 import numpy as np
-from torchvision import transforms
 
 LOGGER = logging.getLogger(__name__)
 

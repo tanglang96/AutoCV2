@@ -5,8 +5,6 @@ import logging
 
 import numpy as np
 import torch
-from torch import nn
-
 
 LOGGER = logging.getLogger(__name__)
 

@@ -169,12 +169,9 @@ class Model(LogicModel):
                 for policy_eval in range(num_sub_policy):
                     valid_dataloader = self.build_or_get_dataloader('valid', self.datasets['valid'],
                                                                     self.datasets['num_valids'])
-                    # original_valid_batch_size = valid_dataloader.batch_sampler.batch_size
-                    # valid_dataloader.batch_sampler.batch_size = batch_size
 
                     valid_metrics = self.epoch_valid(self.info['loop']['epoch'], valid_dataloader, reduction='max')
 
-                    # valid_dataloader.batch_sampler.batch_size = original_valid_batch_size
                     metrics.append(valid_metrics)
                 loss = np.max([m['loss'] for m in metrics])
                 score = np.max([m['score'] for m in metrics])
@@ -345,7 +342,7 @@ class Model(LogicModel):
                 examples = torch.cat([examples, torch.flip(examples, dims=[-1])], dim=0)
             logits = self.model_pred(examples, tau=tau)
 
-            # avergae
+            # average
             if self.use_test_time_augmentation:
                 logits1, logits2 = torch.split(logits, batch_size, dim=0)
                 logits = (logits1 + logits2) / 2.0

@@ -32,14 +32,11 @@ class ScheduledOptimizer:
         for key, value in opt_pararms.items():
             tag = self.tag if self.tag is not None else 'train'
             if not isinstance(value, (float, int)):
-                # LOGGER.warning('CANNOT SUPPORT type(%s) at ([%s] %s %s)', type(value), tag, key, str(value))
                 continue
-        # LOGGER.debug('update optimizer params:%s', self.opt_params)
         return self
 
     def step(self, epoch=None):
         self.epoch = self.epoch + (1.0 / self.steps_per_epoch) if epoch is None else epoch
-        # self.update(self.epoch)
         if self.clip_grad_max_norm is not None and self.clip_grad_max_norm > 0.0:
             torch.nn.utils.clip_grad_norm_(self._parameters, self.clip_grad_max_norm, norm_type=1)
         self._optimizer.step()
