@@ -8,10 +8,10 @@ import torch
 import torchvision as tv
 import numpy as np
 
-import skeleton
-from skeleton.nn.resnet import ResNet18
-from skeleton.projects import LogicModel, get_logger
-from skeleton.projects.others import NBAC, AUC
+import src
+from src.nn.resnet import ResNet18
+from src.projects import LogicModel, get_logger
+from src.projects.others import NBAC, AUC
 
 torch.backends.cudnn.benchmark = True
 threads = [
@@ -69,21 +69,19 @@ class Model(LogicModel):
         num_class = self.info['dataset']['num_class']
 
         epsilon = min(0.1, max(0.001, 0.001 * pow(num_class / 10, 2)))
-        self.model.norm = skeleton.nn.Normalize(self.info['dataset']['train']['data']['mean'],
-                                                   self.info['dataset']['train']['data']['std'],
-                                                   inplace=False).cuda().half()
-        self.model_pred.norm = skeleton.nn.Normalize(self.info['dataset']['train']['data']['mean'],
-                                                        self.info['dataset']['train']['data']['std'],
-                                                        inplace=False).cuda().half()
+        self.model.norm = src.nn.Normalize(self.info['dataset']['train']['data']['mean'],
+                                           self.info['dataset']['train']['data']['std'],
+                                           inplace=False).cuda().half()
+        self.model_pred.norm = src.nn.Normalize(self.info['dataset']['train']['data']['mean'],
+                                                self.info['dataset']['train']['data']['std'],
+                                                inplace=False).cuda().half()
         if self.is_multiclass():
             self.model.loss_fn = torch.nn.BCEWithLogitsLoss(reduction='none')
-            # self.model.loss_fn = skeleton.nn.BinaryCrossEntropyLabelSmooth(num_class, epsilon=epsilon, reduction='none')
             self.tau = 8.0
             LOGGER.info('[update_model] %s (tau:%f, epsilon:%f)', self.model.loss_fn.__class__.__name__, self.tau,
                         epsilon)
         else:
             self.model.loss_fn = torch.nn.CrossEntropyLoss(reduction='none')
-            # self.model.loss_fn = skeleton.nn.CrossEntropyLabelSmooth(num_class, epsilon=epsilon)
             self.tau = 8.0
             LOGGER.info('[update_model] %s (tau:%f, epsilon:%f)', self.model.loss_fn.__class__.__name__, self.tau,
                         epsilon)
@@ -100,18 +98,17 @@ class Model(LogicModel):
 
         warmup_multiplier = 2.0
         lr_multiplier = max(1.0, batch_size / 32)
-        scheduler_lr = skeleton.optim.gradual_warm_up(
-            skeleton.optim.get_reduce_on_plateau_scheduler(
+        scheduler_lr = src.optim.gradual_warm_up(
+            src.optim.get_reduce_on_plateau_scheduler(
                 0.025 * lr_multiplier / warmup_multiplier,
                 patience=10, factor=.5, metric_name='train_loss'
             ),
             warm_up_epoch=5,
             multiplier=warmup_multiplier
         )
-        self.optimizer = skeleton.optim.ScheduledOptimizer(
+        self.optimizer = src.optim.ScheduledOptimizer(
             params,
             torch.optim.SGD,
-            # skeleton.optim.SGDW,
             steps_per_epoch=steps_per_epoch,
             clip_grad_max_norm=None,
             lr=scheduler_lr,
@@ -153,7 +150,7 @@ class Model(LogicModel):
 
             original_valid_policy = self.dataloaders['valid'].dataset.transform.transforms
             original_train_policy = self.dataloaders['train'].dataset.transform.transforms
-            policy = skeleton.data.augmentations.autoaug_policy()
+            policy = src.data.augmentations.autoaug_policy()
 
             num_policy_search = 100
             num_sub_policy = 3
@@ -165,7 +162,7 @@ class Model(LogicModel):
                 self.dataloaders['valid'].dataset.transform.transforms = original_valid_policy + [
                     lambda t: t.cpu().float() if isinstance(t, torch.Tensor) else torch.Tensor(t),
                     tv.transforms.ToPILImage(),
-                    skeleton.data.augmentations.Augmentation(
+                    src.data.augmentations.Augmentation(
                         selected_policy
                     ),
                     tv.transforms.ToTensor(),
@@ -198,7 +195,7 @@ class Model(LogicModel):
 
             policy_sorted_index = np.argsort([p['score'] for p in searched_policy])[::-1][:num_select_policy]
             policy = flatten([searched_policy[idx]['policy'] for idx in policy_sorted_index])
-            policy = skeleton.data.augmentations.remove_duplicates(policy)
+            policy = src.data.augmentations.remove_duplicates(policy)
 
             LOGGER.info('[adapt] [FAA] scores: %s',
                         [searched_policy[idx]['score'] for idx in policy_sorted_index])
@@ -207,7 +204,7 @@ class Model(LogicModel):
             self.dataloaders['train'].dataset.transform.transforms = original_train_policy + [
                 lambda t: t.cpu().float() if isinstance(t, torch.Tensor) else torch.Tensor(t),
                 tv.transforms.ToPILImage(),
-                skeleton.data.augmentations.Augmentation(
+                src.data.augmentations.Augmentation(
                     policy
                 ),
                 tv.transforms.ToTensor(),
@@ -241,12 +238,7 @@ class Model(LogicModel):
             original_labels = labels
             if not self.is_multiclass():
                 labels = labels.argmax(dim=-1)
-
-            # batch_size = examples.size(0)
-            # examples = torch.cat([examples, torch.flip(examples, dims=[-1])], dim=0)
-            # labels = torch.cat([labels, labels], dim=0)
-
-            skeleton.nn.MoveToHook.to((examples, labels), self.device, self.is_half)
+            src.nn.MoveToHook.to((examples, labels), self.device, self.is_half)
             logits, loss = model(examples, labels, tau=self.tau)
             loss.backward()
 
@@ -254,10 +246,6 @@ class Model(LogicModel):
             optimizer.update(maximum_epoch=max_epoch)
             optimizer.step()
             model.zero_grad()
-
-            # logits1, logits2 = torch.split(logits, batch_size, dim=0)
-            # logits = (logits1 + logits2) / 2.0
-
             logits, prediction = self.activation(logits.float())
             tpr, tnr, nbac = NBAC(prediction, original_labels.float())
             auc = AUC(logits, original_labels.float())
@@ -294,7 +282,6 @@ class Model(LogicModel):
             if not self.is_multiclass():
                 labels = labels.argmax(dim=-1)
 
-            # skeleton.nn.MoveToHook.to((examples, labels), self.device, self.is_half)
             logits, loss = self.model(examples, labels, tau=tau, reduction=reduction)
 
             logits, prediction = self.activation(logits.float())
@@ -355,16 +342,11 @@ class Model(LogicModel):
         predictions = []
         self.model_pred.eval()
         for step, (examples, labels) in enumerate(dataloader):
-            # examples = examples[0]
-            # skeleton.nn.MoveToHook.to((examples, labels), self.device, self.is_half)
-
             batch_size = examples.size(0)
 
             # Test-Time Augment flip
             if self.use_test_time_augmentation:
                 examples = torch.cat([examples, torch.flip(examples, dims=[-1])], dim=0)
-
-            # skeleton.nn.MoveToHook.to((examples, labels), self.device, self.is_half)
             logits = self.model_pred(examples, tau=tau)
 
             # avergae

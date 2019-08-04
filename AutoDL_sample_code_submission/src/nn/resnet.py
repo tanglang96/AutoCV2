@@ -8,7 +8,7 @@ import torchvision.models as models
 from torch.utils import model_zoo
 from torchvision.models.resnet import BasicBlock, model_urls, Bottleneck
 
-import skeleton
+import src
 
 formatter = logging.Formatter(fmt='[%(asctime)s %(levelname)s %(filename)s] %(message)s')
 
@@ -32,7 +32,7 @@ class ResNet18(models.ResNet):
             )
         elif in_channels == 1:
             self.stem = torch.nn.Sequential(
-                skeleton.nn.CopyChannels(3),
+                src.nn.CopyChannels(3),
             )
         else:
             self.stem = torch.nn.Sequential(
@@ -80,7 +80,7 @@ class ResNet18(models.ResNet):
         loss = self.loss_fn(input=logits, target=targets)
 
         if self._class_normalize and isinstance(self.loss_fn, (
-                torch.nn.BCEWithLogitsLoss, skeleton.nn.BinaryCrossEntropyLabelSmooth)):
+                torch.nn.BCEWithLogitsLoss, src.nn.BinaryCrossEntropyLabelSmooth)):
             pos = (targets == 1).to(logits.dtype)
             neg = (targets < 1).to(logits.dtype)
             npos = pos.sum()
