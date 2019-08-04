@@ -82,6 +82,8 @@ def get_reduce_on_plateau_scheduler(init_lr, factor=0.1, patience=10, threshold=
             self.metric_name = metric_name
 
         def __call__(self, e, **kwargs):
+            if 'diverge_scale' in kwargs:  # reduce learning rate while divergence
+                self.lr *= kwargs['diverge_scale']
             if self.metric_name not in kwargs:
                 return self.lr
             metric = kwargs[self.metric_name]

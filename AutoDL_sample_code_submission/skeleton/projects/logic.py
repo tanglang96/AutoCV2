@@ -63,7 +63,8 @@ class LogicModel(Model):
             'dataset': {
                 'train_info_sample': 256,
                 'cv_valid_ratio': 0.1,
-                'max_valid_count': 512, # should be big enough to find the best model, but too big will slow down training speed
+                'max_valid_count': 512,
+                # should be big enough to find the best model, but too big will slow down training speed
 
                 'max_size': 64,
                 'base': 16,  # input size should be multipliers of 16
@@ -284,7 +285,8 @@ class LogicModel(Model):
                 'num_valids': num_valids
             }
         else:
-            dataset = dataset.shuffle(buffer_size=num_valids * 4, reshuffle_each_iteration=True)   # random here is important, reshuffle seems useless
+            dataset = dataset.shuffle(buffer_size=num_valids * 4,
+                                      reshuffle_each_iteration=False)  # random here is important, reshuffle seems useless
             train = dataset.skip(num_valids)
             valid = dataset.take(num_valids)
             self.datasets = {
@@ -429,7 +431,7 @@ class LogicModel(Model):
     def update_condition(self, metrics=None):
         self.info['condition']['first']['train'] = False
         self.info['loop']['epoch'] += 1
-
+        self.last_checkpoint = metrics
         metrics.update({'epoch': self.info['loop']['epoch']})
         self.checkpoints.append(metrics)
 
@@ -542,6 +544,10 @@ class LogicModel(Model):
     def get_total_time(self):
         return sum([self.timers[key].total_time for key in self.timers.keys()])
 
+    def handle_divergence(self):
+        self.model.load_state_dict(self.last_checkpoint['model'])
+        self.optimizer.update(diverge_scale=0.25)
+
     def train(self, dataset, remaining_time_budget=None):
         LOGGER.debug(self)
         LOGGER.debug('[train] [%02d] budget:%f', self.info['loop']['epoch'], remaining_time_budget)
@@ -553,8 +559,10 @@ class LogicModel(Model):
             LOGGER.info(self)
         self.timers['train']('build_dataset')
         inner_epoch = 0
-        # self.model.__init__()
-        # print(self.model)
+        last_metrics = {
+            'loss': 0,
+            'score': 0,
+        }
         while True:
             inner_epoch += 1
             remaining_time_budget -= self.timers['train'].step_time
@@ -562,7 +570,9 @@ class LogicModel(Model):
             self.timers['train']('start', reset_step=True)
             train_metrics = self.epoch_train(self.info['loop']['epoch'], self.train_dataloader)
             self.timers['train']('train')
-
+            if last_metrics['score'] - train_metrics['score'] > 0.1 and train_metrics['score'] < 0.95:
+                self.handle_divergence()
+            last_metrics = dict(train_metrics)
             train_score = np.min([c['train']['score'] for c in self.checkpoints[-20:] + [{'train': train_metrics}]])
             if train_score > self.hyper_params['conditions']['skip_valid_score_threshold'] or \
                             self.info['loop']['test'] >= self.hyper_params['conditions']['skip_valid_after_test']:
