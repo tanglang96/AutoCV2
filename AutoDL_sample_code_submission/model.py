@@ -1,17 +1,18 @@
 # -*- coding: utf-8 -*-
 from __future__ import absolute_import
+
 import os
 import threading
 
+import numpy as np
 import tensorflow as tf
 import torch
 import torchvision as tv
-import numpy as np
 
 import src
 from src.nn.resnet import ResNet18
 from src.projects import LogicModel, get_logger
-from src.projects.others import NBAC, AUC
+from src.utils.others import NBAC, AUC
 
 torch.backends.cudnn.benchmark = True
 threads = [
@@ -240,20 +241,12 @@ class Model(LogicModel):
             optimizer.step()
             model.zero_grad()
             logits, prediction = self.activation(logits.float())
-            tpr, tnr, nbac = NBAC(prediction, original_labels.float())
             auc = AUC(logits, original_labels.float())
-
-            score = auc if self.hyper_params['conditions']['score_type'] == 'auc' else float(nbac.detach().float())
+            score = auc
             metrics.append({
                 'loss': loss.detach().float().cpu(),
                 'score': score,
             })
-
-            LOGGER.debug(
-                '[train] [%02d] [%03d/%03d] loss:%.6f AUC:%.3f NBAC:%.3f tpr:%.3f tnr:%.3f, lr:%.8f',
-                epoch, step, num_steps, loss, auc, nbac, tpr, tnr,
-                optimizer.get_learning_rate()
-            )
 
         train_loss = np.average([m['loss'] for m in metrics])
         train_score = np.average([m['score'] for m in metrics])
@@ -278,20 +271,12 @@ class Model(LogicModel):
             logits, loss = self.model(examples, labels, tau=tau, reduction=reduction)
 
             logits, prediction = self.activation(logits.float())
-            tpr, tnr, nbac = NBAC(prediction, original_labels.float())
             auc = AUC(logits, original_labels.float())
-
-            score = auc if self.hyper_params['conditions']['score_type'] == 'auc' else float(nbac.detach().float())
+            score = auc
             metrics.append({
                 'loss': loss.detach().float().cpu(),
                 'score': score,
             })
-
-            LOGGER.debug(
-                '[valid] [%02d] [%03d/%03d] loss:%.6f AUC:%.3f NBAC:%.3f tpr:%.3f tnr:%.3f, lr:%.8f',
-                epoch, step, num_steps, loss, auc, nbac, tpr, tnr,
-                self.optimizer.get_learning_rate()
-            )
         if reduction == 'avg':
             valid_loss = np.average([m['loss'] for m in metrics])
             valid_score = np.average([m['score'] for m in metrics])

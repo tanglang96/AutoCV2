@@ -1,18 +1,14 @@
 # -*- coding: utf-8 -*-
 from __future__ import absolute_import
-import random
 
 import tensorflow as tf
-import torchvision as tv
 import torch
-import numpy as np
-
-from .api import Model
-from .others import *
-import src
-
-from sklearn.preprocessing import LabelEncoder
 from sklearn.model_selection import StratifiedShuffleSplit
+from sklearn.preprocessing import LabelEncoder
+
+import src
+from src.utils.others import *
+from src.projects.base_model import Model
 
 LOGGER = get_logger(__name__)
 
@@ -63,7 +59,7 @@ class LogicModel(Model):
             'dataset': {
                 'train_info_sample': 256,
                 'cv_valid_ratio': 0.1,
-                'max_valid_count': 512,
+                'max_valid_count': 512,  # initial 128
                 # should be big enough to find the best model, but too big will slow down training speed
 
                 'max_size': 64,
@@ -72,7 +68,7 @@ class LogicModel(Model):
                 'batch_size': 32,
                 'steps_per_epoch': 20,
                 'max_epoch': 100,  # initial value
-                'batch_size_test': 256,
+                'batch_size_test': 512,
             },
             'checkpoints': {
                 'keep': 30
@@ -264,7 +260,7 @@ class LogicModel(Model):
             self.dataloaders['valid'] = torch.utils.data.DataLoader(
                 valid_dataset,
                 batch_size=self.hyper_params['dataset']['batch_size_test'],
-                shuffle=False, drop_last=False, num_workers=0, pin_memory=False
+                shuffle=False, drop_last=False, num_workers=4, pin_memory=False
             )
             self.info['condition']['first']['valid'] = False
 
@@ -276,7 +272,7 @@ class LogicModel(Model):
             }
         else:
             dataset = dataset.shuffle(buffer_size=num_valids * 4,
-                                      reshuffle_each_iteration=False)  # random here is important, reshuffle seems useless
+                                      reshuffle_each_iteration=False)  # random here is important(data1 0.04->0.7), reshuffle seems useless
             train = dataset.skip(num_valids)
             valid = dataset.take(num_valids)
             self.datasets = {
@@ -345,6 +341,8 @@ class LogicModel(Model):
             preprocessor = lambda *tensor: preprocessor2(preprocessor1(*tensor))
 
             # batch_size = 500
+            if mode == 'valid':
+                dataset = dataset.cache()
             tf_dataset = dataset.apply(
                 tf.data.experimental.map_and_batch(
                     map_func=lambda *x: (preprocessor(x[0]), x[1]),
@@ -374,7 +372,7 @@ class LogicModel(Model):
             self.dataloaders[mode] = torch.utils.data.DataLoader(
                 dataset,
                 batch_size=self.hyper_params['dataset']['batch_size_test'],
-                shuffle=False, drop_last=False, num_workers=0, pin_memory=False
+                shuffle=False, drop_last=False, num_workers=4, pin_memory=False
             )
             self.info['condition']['first'][mode] = False
         LOGGER.debug('[dataloader] %s build end', mode)

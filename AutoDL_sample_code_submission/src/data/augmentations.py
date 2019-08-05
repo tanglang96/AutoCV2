@@ -121,15 +121,6 @@ def Cutout(img, v):  # [0, 60] => percentage: [0, 0.2]
 
     return CutoutAbs(img, v)
 
-    # x0 = np.random.uniform(w - v)
-    # y0 = np.random.uniform(h - v)
-    # xy = (x0, y0, x0 + v, y0 + v)
-    # color = (127, 127, 127)
-    # img = img.copy()
-    # PIL.ImageDraw.Draw(img).rectangle(xy, color)
-    # return img
-
-
 def CutoutAbs(img, v):  # [0, 60] => percentage: [0, 0.2]
     # assert 0 <= v <= 20
     if v < 0:
