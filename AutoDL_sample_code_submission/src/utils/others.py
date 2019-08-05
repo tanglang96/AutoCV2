@@ -8,10 +8,22 @@ from functools import reduce
 import tensorflow as tf
 import torchvision as tv
 import numpy as np
+import subprocess
+import re
+
+
+def cur_mem_cost():
+    pid = os.getpid()
+    res = subprocess.getstatusoutput(f"cat /proc/{pid}/status | grep VmRSS")[1].split("\n")[0]
+    p = re.compile(r'\s+')
+    l = p.split(res)
+    mem_cost = int(l[1])
+    return mem_cost / 1024
 
 
 def get_logger(name, stream=sys.stderr):
-    formatter = logging.Formatter(fmt='[%(asctime)s %(levelname)s %(filename)s] %(message)s')
+    formatter = logging.Formatter(
+        fmt='[memory: %.2fM ' % (cur_mem_cost()) + '%(asctime)s %(levelname)s %(filename)s] %(message)s')
 
     handler = logging.StreamHandler(stream)
     handler.setFormatter(formatter)
@@ -29,7 +41,7 @@ LOGGER = get_logger(__name__)
 def get_tf_resize(height=None, width=None):
     def preprocessor(tensor):
         # tensor = tensor[0]
-        tensor = tf.reduce_mean(tensor,0)
+        tensor = tf.reduce_mean(tensor, 0)
         in_height, in_width, in_channels = tensor.shape
         LOGGER.info('[get_tf_resize] shape:%s', tensor.shape)
 
@@ -40,6 +52,7 @@ def get_tf_resize(height=None, width=None):
 
         # tensor = (tensor - 0.5) / 0.25
         return tensor
+
     return preprocessor
 
 
@@ -49,6 +62,7 @@ def get_tf_to_tensor(is_random_flip=True):
             tensor = tf.image.random_flip_left_right(tensor)
         tensor = tf.transpose(tensor, perm=[2, 0, 1])
         return tensor
+
     return preprocessor
 
 
@@ -60,7 +74,7 @@ def NBAC(logits, labels):
     negative_mask = labels < 1
 
     tpr = (logits * labels).sum() / positive_mask.sum()
-    tnr = ((1-logits) * (1-labels)).sum() / negative_mask.sum()
+    tnr = ((1 - logits) * (1 - labels)).sum() / negative_mask.sum()
     return tpr, tnr, (tpr + tnr - 1)
 
 
@@ -125,7 +139,7 @@ def get_valid_columns(solution):
     num_examples = solution.shape[0]
     col_sum = np.sum(solution, axis=0)
     valid_columns = np.where(1 - np.isclose(col_sum, 0) -
-                               np.isclose(col_sum, num_examples))[0]
+                             np.isclose(col_sum, num_examples))[0]
     return valid_columns
 
 
