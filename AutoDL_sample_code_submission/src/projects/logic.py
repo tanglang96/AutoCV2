@@ -260,7 +260,7 @@ class LogicModel(Model):
             self.dataloaders['valid'] = torch.utils.data.DataLoader(
                 valid_dataset,
                 batch_size=self.hyper_params['dataset']['batch_size_test'],
-                shuffle=False, drop_last=False, num_workers=4, pin_memory=False
+                shuffle=False, drop_last=False, num_workers=0, pin_memory=False
             )
             self.info['condition']['first']['valid'] = False
 
@@ -372,7 +372,7 @@ class LogicModel(Model):
             self.dataloaders[mode] = torch.utils.data.DataLoader(
                 dataset,
                 batch_size=self.hyper_params['dataset']['batch_size_test'],
-                shuffle=False, drop_last=False, num_workers=4, pin_memory=False
+                shuffle=False, drop_last=False, num_workers=0, pin_memory=False
             )
             self.info['condition']['first'][mode] = False
         LOGGER.debug('[dataloader] %s build end', mode)
