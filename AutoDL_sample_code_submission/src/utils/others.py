@@ -21,9 +21,15 @@ def cur_mem_cost():
     return mem_cost / 1024
 
 
+def cur_gpu_cost():
+    res = subprocess.getstatusoutput(f"nvidia-smi --query-gpu=memory.used --format=csv")[1].split("\n")[1]
+    return res
+
+
 def get_logger(name, stream=sys.stderr):
     formatter = logging.Formatter(
-        fmt='[memory: %.2fM ' % (cur_mem_cost()) + '%(asctime)s %(levelname)s %(filename)s] %(message)s')
+        fmt='[%(asctime)s %(filename)s'+ ' gpu: %s ' % (cur_gpu_cost()) + 'mem: %.2fM ' % (
+        cur_mem_cost())+ '%(message)s] ')
 
     handler = logging.StreamHandler(stream)
     handler.setFormatter(formatter)
