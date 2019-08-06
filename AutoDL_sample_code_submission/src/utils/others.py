@@ -22,7 +22,7 @@ def cur_mem_cost():
 
 
 def cur_gpu_cost():
-    res = subprocess.getstatusoutput(f"nvidia-smi --query-gpu=memory.used --format=csv")[1].split("\n")[1]
+    res = subprocess.getstatusoutput(r"nvidia-smi --query-gpu=memory.used --format=csv")[1].split("\n")[1]
     return res
 
 
