@@ -146,7 +146,7 @@ class LogicModel(Model):
 
         LOGGER.info('[%s] scan before', 'sample')
         num_samples = self.hyper_params['dataset']['train_info_sample']
-        sample = dataset.take(num_samples).prefetch(buffer_size=tf.data.experimental.AUTOTUNE)
+        sample = dataset.take(num_samples).prefetch(buffer_size=64)
         train = src.data.TFDataset(self.session, sample, num_samples)
         self.info['dataset']['train'] = train.scan(samples=num_samples)
         del train
@@ -198,7 +198,7 @@ class LogicModel(Model):
                     map_func=lambda *x: (preprocessor(x[0]), x[1]),
                     batch_size=batchsize,
                     drop_remainder=False,
-                    num_parallel_calls=tf.data.experimental.AUTOTUNE
+                    num_parallel_calls=4
                 )
             ).prefetch(buffer_size=3)
             dataset = src.data.TFDataset(self.session, tf_dataset, num_images)
@@ -299,27 +299,27 @@ class LogicModel(Model):
             if num_items < 10000:
                 dataset = dataset.map(
                     lambda *x: (preprocessor1(x[0]), x[1]),
-                    num_parallel_calls=tf.data.experimental.AUTOTUNE
+                    num_parallel_calls=4
                 )
                 dataset = dataset.cache()
                 dataset = dataset.apply(
-                    tf.data.experimental.shuffle_and_repeat(buffer_size=batch_size * 4)
+                    tf.data.experimental.shuffle_and_repeat(buffer_size=batch_size * 10)
                 )
 
                 dataset = dataset.map(
                     lambda *x: (preprocessor2(x[0]), x[1]),
-                    num_parallel_calls=tf.data.experimental.AUTOTUNE
-                ).prefetch(buffer_size=batch_size * 3)
+                    num_parallel_calls=4
+                ).prefetch(buffer_size=batch_size * 10)
 
             else:
                 dataset = dataset.apply(
-                    tf.data.experimental.shuffle_and_repeat(buffer_size=batch_size * 4)
+                    tf.data.experimental.shuffle_and_repeat(buffer_size=batch_size * 10)
                 )
 
                 dataset = dataset.map(
                     lambda *x: (preprocessor(x[0]), x[1]),
-                    num_parallel_calls=tf.data.experimental.AUTOTUNE
-                ).prefetch(buffer_size=batch_size * 3)
+                    num_parallel_calls=4
+                ).prefetch(buffer_size=batch_size * 10)
 
             dataset = src.data.TFDataset(self.session, dataset, num_items)
 
@@ -348,9 +348,9 @@ class LogicModel(Model):
                     map_func=lambda *x: (preprocessor(x[0]), x[1]),
                     batch_size=batch_size,
                     drop_remainder=False,
-                    num_parallel_calls=tf.data.experimental.AUTOTUNE
+                    num_parallel_calls=4
                 )
-            ).prefetch(buffer_size=3)
+            ).prefetch(buffer_size=64)
 
             dataset = src.data.TFDataset(self.session, tf_dataset, num_items)
 
