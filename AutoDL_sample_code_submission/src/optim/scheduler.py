@@ -3,7 +3,6 @@ from __future__ import absolute_import
 import math
 import logging
 
-
 LOGGER = logging.getLogger(__name__)
 
 
@@ -12,12 +11,14 @@ def gradual_warm_up(scheduler, warm_up_epoch, multiplier):
         lr = scheduler(e, **kwargs)
         lr = lr * ((multiplier - 1.0) * min(e, warm_up_epoch) / warm_up_epoch + 1)
         return lr
+
     return schedule
 
 
 def get_discrete_epoch(scheduler):
     def schedule(e, **kwargs):
         return scheduler(int(e), **kwargs)
+
     return schedule
 
 
@@ -25,6 +26,7 @@ def get_change_scale(scheduler, init_scale=1.0):
     def schedule(e, scale=None, **kwargs):
         lr = scheduler(e, **kwargs)
         return lr * (scale if scale is not None else init_scale)
+
     return schedule
 
 
@@ -32,6 +34,7 @@ def get_step_scheduler(init_lr, step_size, gamma=0.1):
     def schedule(e, **kwargs):
         lr = init_lr * gamma ** (e // step_size)
         return lr
+
     return schedule
 
 
@@ -40,6 +43,7 @@ def get_cosine_scheduler(init_lr, maximum_epoch, eta_min=0):
         maximum = kwargs['maximum_epoch'] if 'maximum_epoch' in kwargs else maximum_epoch
         lr = eta_min + (init_lr - eta_min) * (1 + math.cos(math.pi * e / maximum)) / 2
         return lr
+
     return schedule
 
 
@@ -110,4 +114,5 @@ def get_reduce_on_plateau_scheduler(init_lr, factor=0.1, patience=10, threshold=
                 LOGGER.debug('[%s] reduce lr %f -> %f', 'get_reduce_on_plateau', self.lr, lr)
                 self.lr = lr
             return self.lr
+
     return Schedule()

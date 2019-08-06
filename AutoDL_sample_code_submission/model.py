@@ -98,8 +98,8 @@ class Model(LogicModel):
         scheduler_lr = src.optim.gradual_warm_up(
             src.optim.get_reduce_on_plateau_scheduler(
                 0.025 * lr_multiplier / warmup_multiplier,
-                patience=10, factor=.5, metric_name='train_loss'
-            ),
+                patience=4, factor=.8, metric_name='train_loss'
+            ),  # initial lr = 0.025, patience = 10, factor = 0.5
             warm_up_epoch=5,
             multiplier=warmup_multiplier
         )
