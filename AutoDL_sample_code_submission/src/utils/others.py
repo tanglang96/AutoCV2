@@ -28,8 +28,8 @@ def cur_gpu_cost():
 
 def get_logger(name, stream=sys.stderr):
     formatter = logging.Formatter(
-        fmt='[%(asctime)s %(filename)s'+ ' gpu: %s ' % (cur_gpu_cost()) + 'mem: %.2fM ' % (
-        cur_mem_cost())+ '%(message)s] ')
+        fmt='[%(asctime)s %(filename)s'+ ' gpu: %s ' % (cur_gpu_cost()) + 'mem: %.2fM]' % (
+        cur_mem_cost())+ '%(message)s')
 
     handler = logging.StreamHandler(stream)
     handler.setFormatter(formatter)
