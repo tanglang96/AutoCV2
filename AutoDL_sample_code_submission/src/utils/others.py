@@ -14,7 +14,7 @@ import re
 
 def cur_mem_cost():
     pid = os.getpid()
-    res = subprocess.getstatusoutput(f"cat /proc/{pid}/status | grep VmRSS")[1].split("\n")[0]
+    res = subprocess.getstatusoutput(r"cat /proc/%d/status | grep VmRSS"%pid)[1].split("\n")[0]
     p = re.compile(r'\s+')
     l = p.split(res)
     mem_cost = int(l[1])

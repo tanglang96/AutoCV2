@@ -516,6 +516,7 @@ class LogicModel(Model):
             'loss': 0,
             'score': 0,
         }
+        last_skip_valid = False # do not perform continuous validation
         while True:
             inner_epoch += 1
             remaining_time_budget -= self.timers['train'].step_time
@@ -527,7 +528,6 @@ class LogicModel(Model):
                 self.handle_divergence()
             last_metrics = dict(train_metrics)
             train_score = np.min([c['train']['score'] for c in self.checkpoints[-20:] + [{'train': train_metrics}]])
-            last_skip_valid = False # do not perform continuous validation
             if last_skip_valid and (train_score > self.hyper_params['conditions']['skip_valid_score_threshold'] or \
                             self.info['loop']['test'] >= self.hyper_params['conditions']['skip_valid_after_test']):
                 is_first = self.info['condition']['first']['valid']
