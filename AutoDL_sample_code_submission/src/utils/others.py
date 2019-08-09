@@ -14,7 +14,7 @@ import re
 
 def cur_mem_cost():
     pid = os.getpid()
-    res = subprocess.getstatusoutput(r"cat /proc/%d/status | grep VmRSS"%pid)[1].split("\n")[0]
+    res = subprocess.getstatusoutput(r"cat /proc/%d/status | grep VmRSS" % pid)[1].split("\n")[0]
     p = re.compile(r'\s+')
     l = p.split(res)
     mem_cost = int(l[1])
@@ -28,8 +28,8 @@ def cur_gpu_cost():
 
 def get_logger(name, stream=sys.stderr):
     formatter = logging.Formatter(
-        fmt='[%(asctime)s %(filename)s'+ ' gpu: %s ' % (cur_gpu_cost()) + 'mem: %.2fM]' % (
-        cur_mem_cost())+ '%(message)s')
+        fmt='[%(asctime)s %(filename)s' + ' gpu: %s ' % (cur_gpu_cost()) + 'mem: %.2fM]' % (
+            cur_mem_cost()) + '%(message)s')
 
     handler = logging.StreamHandler(stream)
     handler.setFormatter(formatter)
@@ -47,6 +47,10 @@ LOGGER = get_logger(__name__)
 def get_tf_resize(height=None, width=None):
     def preprocessor(tensor):
         # tensor = tensor[0]
+        # n_tensor = tf.shape(tensor)[0]
+        # mask = tf.range(n_tensor)
+        # mask /= tf.reduce_sum(mask)
+        # tensor = tf.reduce_sum(tensor * tf.to_float(tf.reshape(mask, [n_tensor, 1, 1, 1])), 0)
         tensor = tf.reduce_mean(tensor, 0)
         in_height, in_width, in_channels = tensor.shape
         LOGGER.info('[get_tf_resize] shape:%s', tensor.shape)

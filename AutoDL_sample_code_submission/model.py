@@ -10,7 +10,7 @@ import torch
 import torchvision as tv
 
 import src
-from src.nn.resnet import ResNet18
+from src.nn.network import ResNet18, VGG16
 from src.projects import LogicModel, get_logger
 from src.utils.others import NBAC, AUC
 
@@ -42,12 +42,15 @@ class Model(LogicModel):
         self.session = tf.Session()
 
         LOGGER.info('[init] Model')
-        Network = ResNet18  # ResNet18  # BasicNet, SENet18, ResNet18
+        if self.info['dataset']['size'] > 100:
+            Network = ResNet18  # ResNet18  # BasicNet, SENet18, ResNet18
+        else:
+            Network = VGG16
         self.model = Network(in_channels, num_class)
         self.model_pred = Network(in_channels, num_class).eval()
 
         LOGGER.info('[init] weight initialize')
-        if Network in [ResNet18]:
+        if Network in [ResNet18, VGG16]:
             model_path = os.path.join(base_dir, 'models')
             LOGGER.info('model path: %s', model_path)
 
