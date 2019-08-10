@@ -39,6 +39,9 @@ class Model(LogicModel):
         [t.join() for t in threads]
 
         self.device = torch.device('cuda', 0)
+        config = tf.ConfigProto()
+        config.graph_options.optimizer_options.global_jit_level = tf.OptimizerOptions.ON_1
+        self.session = tf.Session(config=config)  # xla accelerate
         self.session = tf.Session()
 
         LOGGER.info('[init] Model')

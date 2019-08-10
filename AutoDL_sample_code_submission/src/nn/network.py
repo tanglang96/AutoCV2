@@ -43,7 +43,7 @@ class ResNet18(models.ResNet):
             self.stem = torch.nn.Sequential(
                 torch.nn.Conv2d(in_channels, 3, kernel_size=3, stride=1, padding=1, bias=False)
             )
-
+        # self.layer4.add_module(name='drop4', module=nn.Dropout2d())
         self.fc = torch.nn.Linear(512 * Block.expansion, num_classes, bias=False)
         self._half = False
         self._class_normalize = True

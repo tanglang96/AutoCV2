@@ -58,7 +58,7 @@ class LogicModel(Model):
         self.hyper_params = {
             'dataset': {
                 'train_info_sample': 256,
-                'cv_valid_ratio': 0.1,
+                'cv_valid_ratio': 0.1,  # initial 0.1
                 'max_valid_count': 512,  # initial 128
                 # should be big enough to find the best model, but too big will slow down training speed
 
@@ -464,6 +464,14 @@ class LogicModel(Model):
             self.done_training = True
             return True
 
+        if self.info['loop']['test'] > 2 and self.checkpoints[-1]['train']['score'] > 0.995 and best_score < 0.8 and \
+                        self.checkpoints[-1]['valid']['score'] < self.checkpoints[-2]['valid']['score']:  # overfitting
+            LOGGER.info('[TERMINATE] starting overfitting (train score:%f valid score:%f)',
+                        self.checkpoints[-1]['train']['score'], self.checkpoints[-1]['valid']['score'])
+            self.info['terminate'] = True
+            self.done_training = True
+            return True
+
         scores = [c['valid']['score'] for c in self.checkpoints]
         diff = (max(scores) - min(scores)) * (1 - max(scores))
         threshold = self.hyper_params['conditions']['threshold_valid_score_diff']
@@ -516,7 +524,7 @@ class LogicModel(Model):
             'loss': 0,
             'score': 0,
         }
-        last_skip_valid = False # do not perform continuous validation
+        last_skip_valid = False  # do not perform continuous validation
         while True:
             inner_epoch += 1
             remaining_time_budget -= self.timers['train'].step_time
@@ -529,7 +537,8 @@ class LogicModel(Model):
             last_metrics = dict(train_metrics)
             train_score = np.min([c['train']['score'] for c in self.checkpoints[-20:] + [{'train': train_metrics}]])
             if last_skip_valid and (train_score > self.hyper_params['conditions']['skip_valid_score_threshold'] or \
-                            self.info['loop']['test'] >= self.hyper_params['conditions']['skip_valid_after_test']):
+                                                self.info['loop']['test'] >= self.hyper_params['conditions'][
+                                                'skip_valid_after_test']):
                 is_first = self.info['condition']['first']['valid']
                 valid_dataloader = self.build_or_get_dataloader('valid', self.datasets['valid'],
                                                                 self.datasets['num_valids'])
