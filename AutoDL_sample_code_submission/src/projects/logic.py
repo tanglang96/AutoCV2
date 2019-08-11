@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 from __future__ import absolute_import
-
+import time
+print('logic.py time:%f'%(time.time()))
 import tensorflow as tf
 import torch
 from sklearn.model_selection import StratifiedShuffleSplit

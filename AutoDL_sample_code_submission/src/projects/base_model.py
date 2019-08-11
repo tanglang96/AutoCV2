@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 from __future__ import absolute_import
-
+import time
+print('base_model.py time:%f'%(time.time()))
 
 class Model:
     def __init__(self, metadata):

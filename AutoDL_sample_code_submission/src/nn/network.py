@@ -1,3 +1,5 @@
+import time
+print('network.py time:%f'%(time.time()))
 import logging
 import sys
 
@@ -51,6 +53,8 @@ class ResNet18(models.ResNet):
 
     def init(self, model_dir, gain=1.):
         sd = model_zoo.load_url(model_urls['resnet18'], model_dir=model_dir)
+        # sd = model_zoo.load_url(model_urls['resnet18'], model_dir=model_dir)
+
         del sd['fc.weight']
         del sd['fc.bias']
         self.load_state_dict(sd, strict=False)
@@ -62,7 +66,7 @@ class ResNet18(models.ResNet):
                 LOGGER.debug('initialize stem weight')
         torch.nn.init.xavier_uniform_(self.fc.weight, gain=gain)
         LOGGER.debug('initialize classifier weight')
-        for m in self.layer4.modules():
+        for m in self.layer4.modules(): # if layer4 initialized, only data4 becomes better
             if isinstance(m, nn.Conv2d):
                 n = m.kernel_size[0] * m.kernel_size[1] * m.in_channels
                 m.weight.data.normal_(0, math.sqrt(2. / n))

@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 from __future__ import absolute_import
-
+import time
+print('model.py time:%f'%(time.time()))
 import os
 import threading
 
@@ -12,19 +13,19 @@ import torchvision as tv
 import src
 from src.nn.network import ResNet18, VGG16
 from src.projects import LogicModel, get_logger
-from src.utils.others import NBAC, AUC
+from src.utils.others import AUC
 
 torch.backends.cudnn.benchmark = True
-threads = [
-    threading.Thread(target=lambda: torch.cuda.synchronize()),
-    threading.Thread(target=lambda: tf.Session())
-]
-[t.start() for t in threads]
+# threads = [
+#     threading.Thread(target=lambda: torch.cuda.synchronize()),
+#     threading.Thread(target=lambda: tf.Session())
+# ]
+# [t.start() for t in threads]
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 LOGGER = get_logger(__name__)
 
-
+print('after model.py time:%f'%(time.time()))
 class Model(LogicModel):
     def __init__(self, metadata):
         super(Model, self).__init__(metadata)
@@ -36,19 +37,20 @@ class Model(LogicModel):
         num_class = self.info['dataset']['num_class']
 
         LOGGER.info('[init] session')
-        [t.join() for t in threads]
+        # [t.join() for t in threads]
 
         self.device = torch.device('cuda', 0)
-        config = tf.ConfigProto()
-        config.graph_options.optimizer_options.global_jit_level = tf.OptimizerOptions.ON_1
-        self.session = tf.Session(config=config)  # xla accelerate
+        # config = tf.ConfigProto()
+        # config.graph_options.optimizer_options.global_jit_level = tf.OptimizerOptions.ON_1
+        # self.session = tf.Session(config=config)  # xla accelerate, seems useless but slow down
         self.session = tf.Session()
 
         LOGGER.info('[init] Model')
-        if self.info['dataset']['size'] > 100:
-            Network = ResNet18  # ResNet18  # BasicNet, SENet18, ResNet18
-        else:
-            Network = VGG16
+        # if self.info['dataset']['size'] > 100:
+        #     Network = ResNet18  # ResNet18  # BasicNet, SENet18, ResNet18
+        # else:
+        #     Network = VGG16
+        Network = ResNet18
         self.model = Network(in_channels, num_class)
         self.model_pred = Network(in_channels, num_class).eval()
 
