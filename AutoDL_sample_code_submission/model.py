@@ -18,6 +18,7 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 LOGGER = get_logger(__name__)
 
+
 class Model(LogicModel):
     def __init__(self, metadata):
         super(Model, self).__init__(metadata)
@@ -182,24 +183,29 @@ class Model(LogicModel):
                 })
 
             flatten = lambda l: [item for sublist in l for item in sublist]
+            if max([p['score'] for p in searched_policy]) > 0.5:
+                print('=' * 30 + ' augmentation ' + '=' * 30)
+                policy_sorted_index = np.argsort([p['score'] for p in searched_policy])[::-1][:num_select_policy]
+                policy = flatten([searched_policy[idx]['policy'] for idx in policy_sorted_index])
+                policy = src.data.augmentations.remove_duplicates(policy)
 
-            policy_sorted_index = np.argsort([p['score'] for p in searched_policy])[::-1][:num_select_policy]
-            policy = flatten([searched_policy[idx]['policy'] for idx in policy_sorted_index])
-            policy = src.data.augmentations.remove_duplicates(policy)
+                LOGGER.info('[adapt] [FAA] scores: %s',
+                            [searched_policy[idx]['score'] for idx in policy_sorted_index])
 
-            LOGGER.info('[adapt] [FAA] scores: %s',
-                        [searched_policy[idx]['score'] for idx in policy_sorted_index])
-
-            self.dataloaders['valid'].dataset.transform.transforms = original_valid_policy
-            self.dataloaders['train'].dataset.transform.transforms = original_train_policy + [
-                lambda t: t.cpu().float() if isinstance(t, torch.Tensor) else torch.Tensor(t),
-                tv.transforms.ToPILImage(),
-                src.data.augmentations.Augmentation(
-                    policy
-                ),
-                tv.transforms.ToTensor(),
-                lambda t: t.to(device=self.device).half()
-            ]
+                self.dataloaders['valid'].dataset.transform.transforms = original_valid_policy
+                self.dataloaders['train'].dataset.transform.transforms = original_train_policy + [
+                    lambda t: t.cpu().float() if isinstance(t, torch.Tensor) else torch.Tensor(t),
+                    tv.transforms.ToPILImage(),
+                    src.data.augmentations.Augmentation(
+                        policy
+                    ),
+                    tv.transforms.ToTensor(),
+                    lambda t: t.to(device=self.device).half()
+                ]
+            else:
+                print('=' * 30 + ' do not use augmentation ' + '=' * 30)
+                self.dataloaders['valid'].dataset.transform.transforms = original_valid_policy
+                self.dataloaders['train'].dataset.transform.transforms = original_train_policy
 
     def activation(self, logits):
         if self.is_multiclass():

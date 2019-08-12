@@ -66,7 +66,7 @@ class LogicModel(Model):
                 'base': 16,  # input size should be multipliers of 16
 
                 'batch_size': 32,
-                'steps_per_epoch': 5,  # initial 20, small dataset needs small steps
+                'steps_per_epoch': 20,  # initial 20, small dataset needs small steps
                 'max_epoch': 100,  # initial value
                 'batch_size_test': 512,
             },
