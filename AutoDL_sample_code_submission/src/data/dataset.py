@@ -1,9 +1,6 @@
 # -*- coding: utf-8 -*-
 from __future__ import absolute_import
-import time
-print('dataset.py time:%f'%(time.time()))
 import logging
-
 import torch
 from torch.utils.data import Dataset
 import numpy as np

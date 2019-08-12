@@ -1,7 +1,5 @@
 # -*- coding: utf-8 -*-
 from __future__ import absolute_import
-import time
-print('logic.py time:%f'%(time.time()))
 import tensorflow as tf
 import torch
 from sklearn.model_selection import StratifiedShuffleSplit
@@ -10,6 +8,7 @@ from sklearn.preprocessing import LabelEncoder
 import src
 from src.utils.others import *
 from src.projects.base_model import Model
+from torchvision import transforms
 
 LOGGER = get_logger(__name__)
 
@@ -67,7 +66,7 @@ class LogicModel(Model):
                 'base': 16,  # input size should be multipliers of 16
 
                 'batch_size': 32,
-                'steps_per_epoch': 20,
+                'steps_per_epoch': 5,  # initial 20, small dataset needs small steps
                 'max_epoch': 100,  # initial value
                 'batch_size_test': 512,
             },
@@ -187,9 +186,9 @@ class LogicModel(Model):
             self.hyper_params['dataset']['batch_size'] = batch_size * 2
         batch_size = self.hyper_params['dataset']['batch_size']
 
-        enough_image = num_images > 5000
+        enough_image = num_images > 5000 # scan should be faster
         if not enough_image:  # when not enough images, scan tensors and merge
-            preprocessor1 = get_tf_resize(input_shape[0], input_shape[1])
+            preprocessor1 = get_tf_resize(int(input_shape[0] * 1.25), int(input_shape[1] * 1.25))   # small dataset keeps large size
             preprocessor2 = get_tf_to_tensor(is_random_flip=True)
             preprocessor = lambda *tensor: preprocessor2(preprocessor1(*tensor))
 
@@ -243,6 +242,7 @@ class LogicModel(Model):
             sampler = src.data.StratifiedSampler(labels)
 
             transform = tv.transforms.Compose([
+                # src.data.Crop(height=int(input_shape[0] * 0.8), width=int(input_shape[1] * 0.8)), # additional augmentation is useless
                 src.data.RandomFlip(p=0.5),
             ])
             train_dataset = src.data.TransformDataset(train_dataset, transform, index=0)

@@ -1,8 +1,6 @@
 # -*- coding: utf-8 -*-
 from __future__ import absolute_import
 import time
-print('timer.py time:%f'%(time.time()))
-import time
 from collections import OrderedDict
 import logging
 

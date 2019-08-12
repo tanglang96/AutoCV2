@@ -1,0 +1,16 @@
+python3 run_local_test.py --dataset_dir /userhome/code/autodl_starting_kit_stable/AutoDL_public_data/Munster;
+cp /userhome/code/autodl_starting_kit_stable/AutoDL_scoring_output/learning* /userhome/code/autodl_starting_kit_stable/result;
+python3 run_local_test.py --dataset_dir /userhome/code/autodl_starting_kit_stable/AutoDL_public_data/Chucky;
+cp /userhome/code/autodl_starting_kit_stable/AutoDL_scoring_output/learning* /userhome/code/autodl_starting_kit_stable/result;
+python3 run_local_test.py --dataset_dir /userhome/code/autodl_starting_kit_stable/AutoDL_public_data/Pedro;
+cp /userhome/code/autodl_starting_kit_stable/AutoDL_scoring_output/learning* /userhome/code/autodl_starting_kit_stable/result;
+python3 run_local_test.py --dataset_dir /userhome/code/autodl_starting_kit_stable/AutoDL_public_data/Decal;
+cp /userhome/code/autodl_starting_kit_stable/AutoDL_scoring_output/learning* /userhome/code/autodl_starting_kit_stable/result;
+python3 run_local_test.py --dataset_dir /userhome/code/autodl_starting_kit_stable/AutoDL_public_data/Hammer;
+cp /userhome/code/autodl_starting_kit_stable/AutoDL_scoring_output/learning* /userhome/code/autodl_starting_kit_stable/result;
+python3 run_local_test.py --dataset_dir /userhome/code/autodl_starting_kit_stable/AutoDL_public_data/Kraut;
+cp /userhome/code/autodl_starting_kit_stable/AutoDL_scoring_output/learning* /userhome/code/autodl_starting_kit_stable/result;
+python3 run_local_test.py --dataset_dir /userhome/code/autodl_starting_kit_stable/AutoDL_public_data/Katze;
+cp /userhome/code/autodl_starting_kit_stable/AutoDL_scoring_output/learning* /userhome/code/autodl_starting_kit_stable/result;
+python3 run_local_test.py --dataset_dir /userhome/code/autodl_starting_kit_stable/AutoDL_public_data/Kreatur;
+cp /userhome/code/autodl_starting_kit_stable/AutoDL_scoring_output/learning* /userhome/code/autodl_starting_kit_stable/result;

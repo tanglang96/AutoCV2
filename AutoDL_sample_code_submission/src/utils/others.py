@@ -1,7 +1,5 @@
 # -*- coding: utf-8 -*-
 from __future__ import absolute_import
-import time
-print('others.py time:%f'%(time.time()))
 import sys
 import os
 import logging

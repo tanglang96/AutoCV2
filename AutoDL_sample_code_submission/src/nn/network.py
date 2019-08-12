@@ -1,5 +1,3 @@
-import time
-print('network.py time:%f'%(time.time()))
 import logging
 import sys
 

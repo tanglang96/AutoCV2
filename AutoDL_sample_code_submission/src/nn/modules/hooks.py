@@ -1,7 +1,5 @@
 # -*- coding: utf-8 -*-
 from __future__ import absolute_import
-import time
-print('hooks.py time:%f'%(time.time()))
 import logging
 
 import torch

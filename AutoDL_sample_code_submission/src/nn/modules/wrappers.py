@@ -1,7 +1,5 @@
 # -*- coding: utf-8 -*-
 from __future__ import absolute_import
-import time
-print('wrappers.py time:%f'%(time.time()))
 import logging
 from functools import wraps
 from collections import OrderedDict

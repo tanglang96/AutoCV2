@@ -1,7 +1,5 @@
 # -*- coding: utf-8 -*-
 from __future__ import absolute_import
-import time
-print('model.py time:%f'%(time.time()))
 import os
 import threading
 
@@ -16,16 +14,10 @@ from src.projects import LogicModel, get_logger
 from src.utils.others import AUC
 
 torch.backends.cudnn.benchmark = True
-# threads = [
-#     threading.Thread(target=lambda: torch.cuda.synchronize()),
-#     threading.Thread(target=lambda: tf.Session())
-# ]
-# [t.start() for t in threads]
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 LOGGER = get_logger(__name__)
 
-print('after model.py time:%f'%(time.time()))
 class Model(LogicModel):
     def __init__(self, metadata):
         super(Model, self).__init__(metadata)
@@ -37,12 +29,8 @@ class Model(LogicModel):
         num_class = self.info['dataset']['num_class']
 
         LOGGER.info('[init] session')
-        # [t.join() for t in threads]
 
         self.device = torch.device('cuda', 0)
-        # config = tf.ConfigProto()
-        # config.graph_options.optimizer_options.global_jit_level = tf.OptimizerOptions.ON_1
-        # self.session = tf.Session(config=config)  # xla accelerate, seems useless but slow down
         self.session = tf.Session()
 
         LOGGER.info('[init] Model')

@@ -1,15 +1,11 @@
 # -*- coding: utf-8 -*-
 from __future__ import absolute_import
-import time
-print('transforms.py time:%f'%(time.time()))
 import os
 import logging
 import hashlib
 import random
-
 import numpy as np
 import torch
-
 
 LOGGER = logging.getLogger(__name__)
 
@@ -51,7 +47,7 @@ class Crop:
         y = np.random.randint(h - self.height)
         x = np.random.randint(w - self.width)
 
-        return image[:, y:y+self.height, x:x+self.width]
+        return image[:, y:y + self.height, x:x + self.width]
 
 
 class Cutout:

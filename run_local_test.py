@@ -46,6 +46,7 @@ import time
 import shutil  # for deleting a whole directory
 import webbrowser
 from multiprocessing import Process
+import argparse
 
 logging.basicConfig(
     level=getattr(logging, verbosity_level),
@@ -136,7 +137,7 @@ if __name__ == '__main__':
     default_starting_kit_dir = _HERE()
     # The default dataset is 'miniciao' under the folder AutoDL_sample_data/
     default_dataset_dir = os.path.join(default_starting_kit_dir,
-                                       'AutoDL_public_data', 'Chucky')
+                                       'AutoDL_public_data', 'Munster')
     default_code_dir = os.path.join(default_starting_kit_dir,
                                     'AutoDL_sample_code_submission')
     default_time_budget = 1200
@@ -166,3 +167,4 @@ if __name__ == '__main__':
     logging.info("dataset_dir = {}".format(get_basename(dataset_dir)))
     logging.info("#" * 50)
     run_baseline(dataset_dir, code_dir, time_budget)
+    # os.system(r'cp /userhome/code/autodl_starting_kit_stable/AutoDL_scoring_output/learning* /userhome/code/autodl_starting_kit_stable/result')
