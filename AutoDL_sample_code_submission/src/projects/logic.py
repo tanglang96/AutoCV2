@@ -2,7 +2,7 @@
 from __future__ import absolute_import
 import tensorflow as tf
 import torch
-from sklearn.model_selection import StratifiedShuffleSplit
+from sklearn.model_selection import StratifiedShuffleSplit, ShuffleSplit
 from sklearn.preprocessing import LabelEncoder
 
 import src
@@ -66,7 +66,7 @@ class LogicModel(Model):
                 'base': 16,  # input size should be multipliers of 16
 
                 'batch_size': 32,
-                'steps_per_epoch': 20,  # initial 20, small dataset needs small steps
+                'steps_per_epoch': 20,  # initial 20, local test show that 10 is better
                 'max_epoch': 100,  # initial value
                 'batch_size_test': 512,
             },
@@ -186,9 +186,11 @@ class LogicModel(Model):
             self.hyper_params['dataset']['batch_size'] = batch_size * 2
         batch_size = self.hyper_params['dataset']['batch_size']
 
-        enough_image = num_images > 5000 # scan should be faster
-        if not enough_image:  # when not enough images, scan tensors and merge
-            preprocessor1 = get_tf_resize(int(input_shape[0] * 1.25), int(input_shape[1] * 1.25))   # small dataset keeps large size
+        enough_image = num_images > 50000  # scan should be faster
+        if (not enough_image) and self.info['dataset']['train']['example']['shape'][
+            0] == 1:  # when not enough images, scan tensors and merge
+            preprocessor1 = get_tf_resize(int(input_shape[0] * 1.25),
+                                          int(input_shape[1] * 1.25))  # small dataset keeps large size
             preprocessor2 = get_tf_to_tensor(is_random_flip=True)
             preprocessor = lambda *tensor: preprocessor2(preprocessor1(*tensor))
 
@@ -218,28 +220,30 @@ class LogicModel(Model):
             index = list(range(num_images))
 
             # StratifiedShuffleSplit
-            labels = LabelEncoder().fit_transform([''.join(str(l)) for l in tensors[1]])
-            unique, counts = np.unique(np.array(labels), return_counts=True)
-            num_single = sum(counts == 1)
-            if num_single > 0:
-                target = unique[np.argmax(counts)]
-                single = unique[counts == 1]
-                for idx, l in enumerate(labels):
-                    if l not in single:
-                        continue
-                    labels[idx] = target
-            LOGGER.info('[StratifiedShuffleSplit] unique label counts: %d, single: %d', len(counts), num_single)
-
-            sss = StratifiedShuffleSplit(n_splits=1, test_size=num_valids, random_state=None)
-            sss = sss.split(index, labels)
-            train_idx, valid_idx = next(sss)
+            # labels = LabelEncoder().fit_transform([''.join(str(l)) for l in tensors[1]])
+            # unique, counts = np.unique(np.array(labels), return_counts=True)
+            # num_single = sum(counts == 1)
+            # if num_single > 0:
+            #     target = unique[np.argmax(counts)]
+            #     single = unique[counts == 1]
+            #     for idx, l in enumerate(labels):
+            #         if l not in single:
+            #             continue
+            #         labels[idx] = target
+            # LOGGER.info('[StratifiedShuffleSplit] unique label counts: %d, single: %d', len(counts), num_single)
+            # sss = StratifiedShuffleSplit(n_splits=1, test_size=num_valids, random_state=None)
+            # sss = sss.split(index, labels)
+            # train_idx, valid_idx = next(sss)
+            ss = ShuffleSplit(n_splits=len(index), test_size=num_valids, random_state=None)
+            ss = ss.split(index)
+            train_idx, valid_idx = next(ss)
 
             train_dataset = torch.utils.data.Subset(dataset, train_idx)
             valid_dataset = torch.utils.data.Subset(dataset, valid_idx)
 
             # Stratified Shuffle
-            labels = [labels[idx] for idx in train_idx]
-            sampler = src.data.StratifiedSampler(labels)
+            # labels = [labels[idx] for idx in train_idx]
+            # sampler = src.data.StratifiedSampler(labels)
 
             transform = tv.transforms.Compose([
                 # src.data.Crop(height=int(input_shape[0] * 0.8), width=int(input_shape[1] * 0.8)), # additional augmentation is useless
@@ -251,12 +255,19 @@ class LogicModel(Model):
             ])
             valid_dataset = src.data.TransformDataset(valid_dataset, transform, index=0)
 
-            self.dataloaders['train'] = src.data.FixedSizeDataLoader(
+            # self.dataloaders['train'] = src.data.FixedSizeDataLoader(
+            #     train_dataset,
+            #     steps=self.hyper_params['dataset']['steps_per_epoch'],
+            #     batch_size=self.hyper_params['dataset']['batch_size'],
+            #     shuffle=True, drop_last=True, num_workers=0, pin_memory=False,
+            #     sampler=sampler
+            # )
+            self.dataloaders['train'] = torch.utils.data.DataLoader(
                 train_dataset,
-                steps=self.hyper_params['dataset']['steps_per_epoch'],
+                # steps=self.hyper_params['dataset']['steps_per_epoch'],
                 batch_size=self.hyper_params['dataset']['batch_size'],
                 shuffle=True, drop_last=True, num_workers=0, pin_memory=False,
-                sampler=sampler
+                # sampler=sampler
             )
             self.dataloaders['valid'] = torch.utils.data.DataLoader(
                 valid_dataset,
@@ -303,9 +314,7 @@ class LogicModel(Model):
                     num_parallel_calls=4
                 )
                 dataset = dataset.cache()
-                dataset = dataset.apply(
-                    tf.data.experimental.shuffle_and_repeat(buffer_size=batch_size * 10)
-                )
+                dataset.shuffle(10 * batch_size, reshuffle_each_iteration=True).repeat()
 
                 dataset = dataset.map(
                     lambda *x: (preprocessor2(x[0]), x[1]),
@@ -313,10 +322,7 @@ class LogicModel(Model):
                 ).prefetch(buffer_size=batch_size * 10)
 
             else:
-                dataset = dataset.apply(
-                    tf.data.experimental.shuffle_and_repeat(buffer_size=batch_size * 10)
-                )
-
+                dataset.shuffle(10 * batch_size, reshuffle_each_iteration=True).repeat()
                 dataset = dataset.map(
                     lambda *x: (preprocessor(x[0]), x[1]),
                     num_parallel_calls=4
@@ -465,7 +471,7 @@ class LogicModel(Model):
             self.done_training = True
             return True
 
-        if self.info['loop']['test'] > 2 and self.checkpoints[-1]['train']['score'] > 0.995 and best_score < 0.8 and \
+        if self.info['loop']['test'] > 2 and self.checkpoints[-1]['train']['score'] > 0.95 and best_score < 0.8 and \
                         self.checkpoints[-1]['valid']['score'] < self.checkpoints[-2]['valid']['score']:  # overfitting
             LOGGER.info('[TERMINATE] starting overfitting (train score:%f valid score:%f)',
                         self.checkpoints[-1]['train']['score'], self.checkpoints[-1]['valid']['score'])

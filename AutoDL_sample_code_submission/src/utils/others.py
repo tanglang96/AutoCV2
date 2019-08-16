@@ -46,11 +46,6 @@ LOGGER = get_logger(__name__)
 
 def get_tf_resize(height=None, width=None):
     def preprocessor(tensor):
-        # tensor = tensor[0]
-        # n_tensor = tf.shape(tensor)[0]
-        # mask = tf.range(n_tensor)
-        # mask /= tf.reduce_sum(mask)
-        # tensor = tf.reduce_sum(tensor * tf.to_float(tf.reshape(mask, [n_tensor, 1, 1, 1])), 0)
         tensor = tf.reduce_mean(tensor, 0)
         in_height, in_width, in_channels = tensor.shape
         LOGGER.info('[get_tf_resize] shape:%s', tensor.shape)
@@ -59,8 +54,6 @@ def get_tf_resize(height=None, width=None):
             LOGGER.info('[get_tf_resize] do not resize (%dx%d)', width, height)
         elif width is not None and height is not None:
             tensor = tf.image.resize_images(tensor, (height, width))
-
-        # tensor = (tensor - 0.5) / 0.25
         return tensor
 
     return preprocessor

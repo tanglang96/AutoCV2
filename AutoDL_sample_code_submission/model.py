@@ -9,7 +9,7 @@ import torch
 import torchvision as tv
 
 import src
-from src.nn.network import ResNet18, VGG16
+from src.nn.network import ResNet18
 from src.projects import LogicModel, get_logger
 from src.utils.others import AUC
 
@@ -35,16 +35,12 @@ class Model(LogicModel):
         self.session = tf.Session()
 
         LOGGER.info('[init] Model')
-        # if self.info['dataset']['size'] > 100:
-        #     Network = ResNet18  # ResNet18  # BasicNet, SENet18, ResNet18
-        # else:
-        #     Network = VGG16
         Network = ResNet18
         self.model = Network(in_channels, num_class)
         self.model_pred = Network(in_channels, num_class).eval()
 
         LOGGER.info('[init] weight initialize')
-        if Network in [ResNet18, VGG16]:
+        if Network in [ResNet18]:
             model_path = os.path.join(base_dir, 'models')
             LOGGER.info('model path: %s', model_path)
 
@@ -124,7 +120,7 @@ class Model(LogicModel):
                     epoch, self.hyper_params['dataset']['max_epoch'],
                     train_score, valid_score)
 
-        self.use_test_time_augmentation = self.info['loop']['test'] > 1
+        self.use_test_time_augmentation = self.info['loop']['test'] > 1  # test augmentation
 
         # Adapt Apply Fast auto aug
         if self.hyper_params['conditions']['use_fast_auto_aug'] and \
@@ -249,6 +245,8 @@ class Model(LogicModel):
                 'loss': loss.detach().float().cpu(),
                 'score': score,
             })
+            if step == self.hyper_params['dataset']['steps_per_epoch']:
+                break
 
         train_loss = np.average([m['loss'] for m in metrics])
         train_score = np.average([m['score'] for m in metrics])

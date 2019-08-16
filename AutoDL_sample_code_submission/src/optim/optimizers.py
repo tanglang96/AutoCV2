@@ -16,7 +16,6 @@ class ScheduledOptimizer:
         self.steps_per_epoch = steps_per_epoch
         self.clip_grad_max_norm = clip_grad_max_norm
         self._opt_params = opt_params
-
         self._optimizer = optimizer(parameters, **self.update_params(0))
 
     def update_params(self, epoch=None, **kwargs):
