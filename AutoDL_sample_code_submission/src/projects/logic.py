@@ -133,7 +133,7 @@ class LogicModel(Model):
         return self.info['dataset']['train']['is_multiclass']
 
     def build_or_get_train_dataloader(self, dataset):
-        if (not self.info['condition']['first']['train']) and self.info['loop']['test'] != 1:
+        if not self.info['condition']['first']['train']:
             return self.build_or_get_dataloader('train')
 
         num_images = self.info['dataset']['size']
@@ -295,98 +295,6 @@ class LogicModel(Model):
                 'num_valids': num_valids
             }
         return self.build_or_get_dataloader('train', self.datasets['train'], num_trains)
-
-    def build_or_get_init_dataloader(self, dataset):
-        num_images = self.info['dataset']['size']
-
-        # split train/valid, validset num is important
-        num_valids = int(min(num_images * self.hyper_params['dataset']['cv_valid_ratio'],
-                             self.hyper_params['dataset']['max_valid_count']))
-        num_trains = num_images - num_valids
-        LOGGER.info('[cv_fold] num_trains:%d num_valids:%d', num_trains, num_valids)
-
-        LOGGER.info('[%s] scan before', 'sample')
-        num_samples = self.hyper_params['dataset']['train_info_sample']
-        sample = dataset.take(num_samples).prefetch(buffer_size=64)
-        train = src.data.TFDataset(self.session, sample, num_samples)
-        self.info['dataset']['train'] = train.scan(samples=num_samples)
-        del train
-        del sample
-        LOGGER.info('[%s] scan after', 'sample')
-
-        height, width, channels = self.info['dataset']['train']['example']['shape'][1:]
-        aspect_ratio = width / height
-
-        # fit image area to 64x64
-        if aspect_ratio > 2 or 1. / aspect_ratio > 2:
-            self.hyper_params['dataset']['max_size'] *= 2
-        size = [min(s, self.hyper_params['dataset']['max_size']) for s in [height, width]]
-
-        # keep aspect ratio
-        if aspect_ratio > 1:
-            size[0] = size[1] / aspect_ratio
-        else:
-            size[1] = size[0] * aspect_ratio
-
-        # too small image use original image
-        if width <= 32 and height <= 32:
-            input_shape = [height, width, channels]
-        else:
-            size = list(map(
-                lambda x: int(x / self.hyper_params['dataset']['base'] + 0.8) * self.hyper_params['dataset']['base'],
-                size))
-            input_shape = size + [channels]
-        LOGGER.info('[input_shape] origin:%s aspect_ratio:%f target:%s', [height, width, channels], aspect_ratio,
-                    input_shape)
-
-        self.hyper_params['dataset']['input'] = input_shape
-
-        num_class = self.info['dataset']['num_class']
-        batch_size = self.hyper_params['dataset']['batch_size']
-        if num_class > batch_size / 2:
-            self.hyper_params['dataset']['batch_size'] = batch_size * 2
-        batch_size = self.hyper_params['dataset']['batch_size']
-
-        preprocessor1 = get_tf_resize(int(input_shape[0] * 1.25),
-                                      int(input_shape[1] * 1.25))  # small dataset keeps large size
-        preprocessor2 = get_tf_to_tensor(is_random_flip=True)
-        preprocessor = lambda *tensor: preprocessor2(preprocessor1(*tensor))
-
-        batchsize = 128
-        tf_dataset = dataset.apply(
-            tf.data.experimental.map_and_batch(
-                map_func=lambda *x: (preprocessor(x[0]), x[1]),
-                batch_size=batchsize,
-                drop_remainder=False,
-                num_parallel_calls=4
-            )
-        ).prefetch(buffer_size=3)
-        tf_dataset.shuffle(buffer_size=self.hyper_params['dataset']['batch_size'])
-        dataset = src.data.TFDataset(self.session, tf_dataset, num_images)
-
-        LOGGER.info('[%s] scan before', 'train')
-        _, tensors = dataset.scan(
-            samples=self.hyper_params['dataset']['batch_size'] * self.hyper_params['dataset']['steps_per_epoch'],
-            with_tensors=True, is_batch=True,
-            device=self.device, half=self.is_half
-        )
-        tensors = [torch.cat(t, dim=0) for t in zip(*tensors)]
-        LOGGER.info('[%s] scan after', 'train')
-
-        del tf_dataset
-        del dataset
-
-        dataset = torch.utils.data.TensorDataset(*tensors)
-        transform = tv.transforms.Compose([
-            src.data.RandomFlip(p=0.5),
-        ])
-        train_dataset = src.data.TransformDataset(dataset, transform, index=0)
-        self.init_train_dataloader = torch.utils.data.DataLoader(
-            train_dataset,
-            batch_size=self.hyper_params['dataset']['batch_size'],
-            shuffle=True, drop_last=True, num_workers=0, pin_memory=False,
-        )
-        return self.init_train_dataloader
 
     def build_or_get_dataloader(self, mode, dataset=None, num_items=0):
         if mode in self.dataloaders and self.dataloaders[mode] is not None:
@@ -613,15 +521,11 @@ class LogicModel(Model):
         LOGGER.debug(self)
         LOGGER.debug('[train] [%02d] budget:%f', self.info['loop']['epoch'], remaining_time_budget)
         self.timers['train']('outer_start', exclude_total=True, reset_step=True)
-        # first epoch small dataset
-        if self.info['condition']['first']['train']:
-            LOGGER.info(self)
-            self.init_train_dataloader = self.build_or_get_init_dataloader(dataset)
-            self.update_model()
-            LOGGER.info('=' * 30 + 'init loader loaded' + '=' * 30)
-        else:
-            self.train_dataloader = self.build_or_get_train_dataloader(dataset)
 
+        self.train_dataloader = self.build_or_get_train_dataloader(dataset)
+        if self.info['condition']['first']['train']:
+            self.update_model()
+            LOGGER.info(self)
         self.timers['train']('build_dataset')
         inner_epoch = 0
         last_metrics = {
@@ -630,14 +534,11 @@ class LogicModel(Model):
         }
         last_skip_valid = False  # do not perform continuous validation
         while True:
-            if self.info['condition']['first']['train']:
-                loader = self.init_train_dataloader
-            else:
-                loader = self.train_dataloader
             inner_epoch += 1
             remaining_time_budget -= self.timers['train'].step_time
+
             self.timers['train']('start', reset_step=True)
-            train_metrics = self.epoch_train(self.info['loop']['epoch'], loader)
+            train_metrics = self.epoch_train(self.info['loop']['epoch'], self.train_dataloader)
             self.timers['train']('train')
             if last_metrics['score'] - train_metrics['score'] > 0.1 and train_metrics['score'] < 0.95:
                 self.handle_divergence()
