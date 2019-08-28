@@ -66,7 +66,8 @@ class LogicModel(Model):
                 'base': 16,  # input size should be multipliers of 16
 
                 'batch_size': 32,
-                'steps_per_epoch': 20,  # initial 20, local test show that 10 is better
+                'steps_per_epoch': 20 if self.info['dataset']['size'] > 2000 else 10,
+                # initial 20, local test show that 10 is better
                 'max_epoch': 100,  # initial value
                 'batch_size_test': 512,
             },
@@ -219,6 +220,28 @@ class LogicModel(Model):
 
             dataset = torch.utils.data.TensorDataset(*tensors)
             index = list(range(num_images))
+            # ShuffleSplit
+            ss = ShuffleSplit(n_splits=len(index), test_size=num_valids, random_state=None)
+            ss = ss.split(index)
+            train_idx, valid_idx = next(ss)
+
+            train_dataset = torch.utils.data.Subset(dataset, train_idx)
+            valid_dataset = torch.utils.data.Subset(dataset, valid_idx)
+            transform = tv.transforms.Compose([
+                src.data.RandomFlip(p=0.5),
+            ])
+            train_dataset = src.data.TransformDataset(train_dataset, transform, index=0)
+
+            transform = tv.transforms.Compose([
+            ])
+            valid_dataset = src.data.TransformDataset(valid_dataset, transform, index=0)
+            self.dataloaders['train'] = torch.utils.data.DataLoader(
+                train_dataset,
+                # steps=self.hyper_params['dataset']['steps_per_epoch'],
+                batch_size=self.hyper_params['dataset']['batch_size'],
+                shuffle=True, drop_last=True, num_workers=0, pin_memory=False,
+                # sampler=sampler
+            )
 
             # StratifiedShuffleSplit
             # labels = LabelEncoder().fit_transform([''.join(str(l)) for l in tensors[1]])
@@ -235,27 +258,25 @@ class LogicModel(Model):
             # sss = StratifiedShuffleSplit(n_splits=1, test_size=num_valids, random_state=None)
             # sss = sss.split(index, labels)
             # train_idx, valid_idx = next(sss)
-            ss = ShuffleSplit(n_splits=len(index), test_size=num_valids, random_state=None)
-            ss = ss.split(index)
-            train_idx, valid_idx = next(ss)
-
-            train_dataset = torch.utils.data.Subset(dataset, train_idx)
-            valid_dataset = torch.utils.data.Subset(dataset, valid_idx)
-
-            # Stratified Shuffle
+            # ss = ShuffleSplit(n_splits=len(index), test_size=num_valids, random_state=None)
+            # ss = ss.split(index)
+            # train_idx, valid_idx = next(ss)
+            #
+            # train_dataset = torch.utils.data.Subset(dataset, train_idx)
+            # valid_dataset = torch.utils.data.Subset(dataset, valid_idx)
+            #
             # labels = [labels[idx] for idx in train_idx]
             # sampler = src.data.StratifiedSampler(labels)
-
-            transform = tv.transforms.Compose([
-                # src.data.Crop(height=int(input_shape[0] * 0.8), width=int(input_shape[1] * 0.8)), # additional augmentation is useless
-                src.data.RandomFlip(p=0.5),
-            ])
-            train_dataset = src.data.TransformDataset(train_dataset, transform, index=0)
-
-            transform = tv.transforms.Compose([
-            ])
-            valid_dataset = src.data.TransformDataset(valid_dataset, transform, index=0)
-
+            #
+            # transform = tv.transforms.Compose([
+            #     src.data.RandomFlip(p=0.5),
+            # ])
+            # train_dataset = src.data.TransformDataset(train_dataset, transform, index=0)
+            #
+            # transform = tv.transforms.Compose([
+            # ])
+            # valid_dataset = src.data.TransformDataset(valid_dataset, transform, index=0)
+            #
             # self.dataloaders['train'] = src.data.FixedSizeDataLoader(
             #     train_dataset,
             #     steps=self.hyper_params['dataset']['steps_per_epoch'],
@@ -263,13 +284,9 @@ class LogicModel(Model):
             #     shuffle=True, drop_last=True, num_workers=0, pin_memory=False,
             #     sampler=sampler
             # )
-            self.dataloaders['train'] = torch.utils.data.DataLoader(
-                train_dataset,
-                # steps=self.hyper_params['dataset']['steps_per_epoch'],
-                batch_size=self.hyper_params['dataset']['batch_size'],
-                shuffle=True, drop_last=True, num_workers=0, pin_memory=False,
-                # sampler=sampler
-            )
+
+
+
             self.dataloaders['valid'] = torch.utils.data.DataLoader(
                 valid_dataset,
                 batch_size=self.hyper_params['dataset']['batch_size_test'],
