@@ -12,3 +12,5 @@ best_submit
 *.log
 *.idea
 *.doc
+*.zip
+AutoDL_sample_data
