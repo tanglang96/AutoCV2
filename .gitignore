@@ -2,8 +2,8 @@
 .idea
 *.png
 *.PNG
-*.idea
-*.md
+log.md
+PR.md
 *.pdf
 *.sh
 *.ipynb
@@ -11,3 +11,4 @@ best_submit
 *.txt
 *.log
 *.idea
+*.doc
